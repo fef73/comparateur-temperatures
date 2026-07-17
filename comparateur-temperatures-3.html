@@ -1,0 +1,560 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Comparateur — Températures du jour</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600;9..144,700&family=Space+Grotesk:wght@400;500;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+  :root{
+    --bg: #0b1622;
+    --bg-panel: #101f30;
+    --bg-card: #132539;
+    --bg-input: #0f1d2c;
+    --hairline: #22384f;
+    --text-hi: #f3f6f9;
+    --text-lo: #8fa4b8;
+    --live: #7ee4b8;
+    --danger: #e76f51;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    background:
+      radial-gradient(ellipse 900px 500px at 15% -10%, rgba(69,123,157,0.18), transparent 60%),
+      radial-gradient(ellipse 700px 500px at 90% 0%, rgba(231,111,81,0.10), transparent 55%),
+      var(--bg);
+    color:var(--text-hi);
+    font-family:'Space Grotesk', sans-serif;
+    min-height:100vh;
+    padding:28px 20px 60px;
+  }
+  .wrap{max-width:1080px;margin:0 auto;}
+
+  header{
+    border-bottom:1px solid var(--hairline);
+    padding-bottom:22px; margin-bottom:24px;
+  }
+  .eyebrow{
+    font-family:'IBM Plex Mono', monospace;
+    font-size:12px; letter-spacing:.14em; text-transform:uppercase;
+    color:var(--live); display:flex; align-items:center; gap:8px; margin-bottom:8px;
+  }
+  .pulse{width:7px;height:7px;border-radius:50%;background:var(--live);
+    box-shadow:0 0 0 0 rgba(126,228,184,.6); animation:pulse 2.2s infinite;}
+  @keyframes pulse{
+    0%{box-shadow:0 0 0 0 rgba(126,228,184,.55);}
+    70%{box-shadow:0 0 0 9px rgba(126,228,184,0);}
+    100%{box-shadow:0 0 0 0 rgba(126,228,184,0);}
+  }
+  h1{
+    font-family:'Fraunces', serif; font-weight:600; font-style:italic;
+    font-size:clamp(28px,4vw,42px); margin:0 0 6px; letter-spacing:-.01em;
+  }
+  .subtitle{color:var(--text-lo); font-size:14px; max-width:56ch;}
+
+  .search-panel{position:relative; margin-bottom:18px;}
+  .search-box{
+    display:flex; align-items:center; gap:10px;
+    background:var(--bg-input); border:1px solid var(--hairline); border-radius:12px;
+    padding:12px 16px;
+  }
+  .search-box svg{flex:none; opacity:.55;}
+  .search-box input{
+    flex:1; background:transparent; border:none; outline:none;
+    color:var(--text-hi); font-family:'Space Grotesk', sans-serif; font-size:15px;
+  }
+  .search-box input::placeholder{color:var(--text-lo);}
+  #search-loading{
+    font-family:'IBM Plex Mono', monospace; font-size:11px; color:var(--text-lo);
+    display:none;
+  }
+
+  .results{
+    position:absolute; left:0; right:0; top:calc(100% + 6px); z-index:20;
+    background:var(--bg-card); border:1px solid var(--hairline); border-radius:12px;
+    overflow:hidden; box-shadow:0 12px 30px rgba(0,0,0,.4);
+    display:none; max-height:320px; overflow-y:auto;
+  }
+  .result-item{
+    padding:11px 16px; cursor:pointer; display:flex; justify-content:space-between; gap:10px;
+    border-bottom:1px solid var(--hairline); align-items:center;
+  }
+  .result-item:last-child{border-bottom:none;}
+  .result-item:hover, .result-item.active{background:rgba(126,228,184,0.08);}
+  .result-name{font-size:14px;}
+  .result-region{font-family:'IBM Plex Mono', monospace; font-size:11px; color:var(--text-lo);}
+  .result-empty{padding:16px; color:var(--text-lo); font-size:13px; font-family:'IBM Plex Mono', monospace;}
+
+  .chips{display:flex; flex-wrap:wrap; gap:9px; margin-bottom:22px;}
+  .chip{
+    display:flex; align-items:center; gap:8px;
+    background:var(--bg-card); border:1px solid var(--hairline); border-radius:999px;
+    padding:7px 8px 7px 14px; font-size:13px;
+  }
+  .chip .dot{width:9px;height:9px;border-radius:50%;flex:none;}
+  .chip button{
+    background:none; border:none; color:var(--text-lo); cursor:pointer;
+    width:20px; height:20px; border-radius:50%; display:flex; align-items:center; justify-content:center;
+    font-size:15px; line-height:1; transition:background .15s ease, color .15s ease;
+  }
+  .chip button:hover{background:rgba(231,111,81,0.18); color:var(--danger);}
+  .chip-empty{
+    font-family:'IBM Plex Mono', monospace; font-size:12.5px; color:var(--text-lo);
+    padding:8px 2px;
+  }
+
+  .panel{
+    background:var(--bg-panel); border:1px solid var(--hairline); border-radius:16px;
+    padding:22px 20px 10px;
+  }
+  .chart-holder{position:relative; height:min(56vh, 440px);}
+  #chart-status{
+    position:absolute; inset:0; display:flex; align-items:center; justify-content:center;
+    font-family:'IBM Plex Mono', monospace; color:var(--text-lo); font-size:13px; text-align:center; padding:0 20px;
+  }
+
+  .cards{
+    display:grid; grid-template-columns:repeat(auto-fit,minmax(190px,1fr));
+    gap:12px; margin-top:22px;
+  }
+  .card{
+    background:var(--bg-card); border:1px solid var(--hairline); border-radius:14px;
+    padding:14px 16px; position:relative; overflow:hidden;
+  }
+  .card::before{
+    content:""; position:absolute; left:0; top:0; bottom:0; width:3px;
+    background:var(--accent);
+  }
+  .card-top-row{display:flex; justify-content:space-between; align-items:flex-start; gap:8px; margin-bottom:10px;}
+  .card-city{font-size:13px; font-weight:500; margin-bottom:2px;}
+  .card-region{font-size:11px; color:var(--text-lo); font-family:'IBM Plex Mono',monospace;}
+  .card-time{
+    font-family:'IBM Plex Mono', monospace; font-size:13px; color:var(--live);
+    white-space:nowrap; padding-top:1px;
+  }
+  .card-temp{
+    font-family:'IBM Plex Mono', monospace; font-weight:600;
+    font-size:26px; line-height:1; margin-bottom:8px;
+  }
+  .card-temp .unit{font-size:13px; color:var(--text-lo); font-weight:400;}
+  .card-range{
+    display:flex; justify-content:space-between; font-family:'IBM Plex Mono', monospace;
+    font-size:11px; color:var(--text-lo); border-top:1px solid var(--hairline); padding-top:8px;
+  }
+  .card-range b{color:var(--text-hi); font-weight:500;}
+
+  .toolbar{
+    display:flex; justify-content:space-between; align-items:center; gap:12px;
+    margin-bottom:14px; flex-wrap:wrap;
+  }
+  .toolbar-right{display:flex; gap:8px; align-items:center;}
+  .btn{
+    font-family:'IBM Plex Mono', monospace; font-size:12px;
+    background:var(--bg-card); color:var(--text-hi); border:1px solid var(--hairline);
+    border-radius:8px; padding:8px 14px; cursor:pointer;
+    transition:border-color .15s ease, transform .1s ease;
+  }
+  .btn:hover{border-color:var(--live);}
+  .btn:active{transform:scale(.97);}
+  #updated-at{font-family:'IBM Plex Mono', monospace; font-size:11.5px; color:var(--text-lo);}
+
+  footer{
+    margin-top:28px; font-family:'IBM Plex Mono', monospace; font-size:11px;
+    color:var(--text-lo); text-align:center; line-height:1.7;
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <div class="eyebrow"><span class="pulse"></span> données en direct — open-meteo</div>
+    <h1>Comparateur de températures</h1>
+    <div class="subtitle">Sélectionne n'importe quelle ville dans le monde et compare les températures du jour, en direct. Tu as aussi l'heure locale.</div>
+  </header>
+
+  <div class="search-panel">
+    <div class="search-box">
+      <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <circle cx="11" cy="11" r="7"></circle>
+        <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+      </svg>
+      <input type="text" id="search-input" placeholder="Ajouter une ville (ex : Lyon, Tokyo, New York…)" autocomplete="off">
+      <span id="search-loading">recherche…</span>
+    </div>
+    <div class="results" id="results"></div>
+  </div>
+
+  <div class="chips" id="chips">
+    <div class="chip-empty">Aucune ville sélectionnée pour l'instant — cherche-en une ci-dessus.</div>
+  </div>
+
+  <div class="toolbar">
+    <div id="updated-at"></div>
+    <div class="toolbar-right">
+      <button class="btn" id="share-btn">🔗 Copier le lien</button>
+      <button class="btn" id="refresh-btn">↻ Actualiser</button>
+    </div>
+  </div>
+
+  <div class="panel">
+    <div class="chart-holder">
+      <div id="chart-status">Ajoute une ville pour démarrer la comparaison.</div>
+      <canvas id="tempChart"></canvas>
+    </div>
+  </div>
+
+  <div class="cards" id="cards"></div>
+
+  <footer>
+    Source : Open-Meteo.com (géocodage + prévisions horaires, sans clé API) · Fuseau horaire local à chaque ville<br>
+    Le lien partagé conserve ta sélection de villes
+  </footer>
+</div>
+
+<script>
+const PALETTE = [
+  "#f4a261","#e76f51","#2a9d8f","#457b9d","#e9c46a",
+  "#a8dadc","#bc6c25","#6a4c93","#ef476f","#06d6a0",
+  "#118ab2","#ffb703","#c77dff","#4cc9f0","#f95738",
+];
+
+let cities = [];       // {id, name, admin1, country, lat, lon, color}
+let colorCounter = 0;
+let chart;
+let debounceTimer;
+
+function nextColor(){
+  const c = PALETTE[colorCounter % PALETTE.length];
+  colorCounter++;
+  return c;
+}
+
+// ---------- URL state ----------
+function encodeState(){
+  const payload = cities.map(c => [c.name, c.admin1 || "", c.country || "", c.lat, c.lon, c.color]);
+  return btoa(unescape(encodeURIComponent(JSON.stringify(payload))));
+}
+function decodeState(str){
+  try{
+    const payload = JSON.parse(decodeURIComponent(escape(atob(str))));
+    return payload.map(([name, admin1, country, lat, lon, color]) => ({
+      id: name + lat + lon, name, admin1, country, lat, lon, color
+    }));
+  }catch(e){ return []; }
+}
+function syncUrl(){
+  const url = new URL(window.location.href);
+  if(cities.length){
+    url.searchParams.set("c", encodeState());
+  } else {
+    url.searchParams.delete("c");
+  }
+  window.history.replaceState({}, "", url.toString());
+}
+
+// ---------- Geocoding search ----------
+const searchInput = document.getElementById("search-input");
+const resultsEl = document.getElementById("results");
+const loadingEl = document.getElementById("search-loading");
+
+searchInput.addEventListener("input", () => {
+  clearTimeout(debounceTimer);
+  const q = searchInput.value.trim();
+  if(q.length < 2){
+    resultsEl.style.display = "none";
+    return;
+  }
+  loadingEl.style.display = "inline";
+  debounceTimer = setTimeout(() => runSearch(q), 350);
+});
+
+document.addEventListener("click", (e) => {
+  if(!e.target.closest(".search-panel")){
+    resultsEl.style.display = "none";
+  }
+});
+
+async function runSearch(q){
+  try{
+    const url = `https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(q)}&count=8&language=fr&format=json`;
+    const res = await fetch(url);
+    const data = await res.json();
+    loadingEl.style.display = "none";
+    renderResults(data.results || []);
+  }catch(err){
+    loadingEl.style.display = "none";
+    resultsEl.innerHTML = `<div class="result-empty">Erreur de recherche. Réessaie.</div>`;
+    resultsEl.style.display = "block";
+  }
+}
+
+function renderResults(list){
+  if(!list.length){
+    resultsEl.innerHTML = `<div class="result-empty">Aucun résultat.</div>`;
+    resultsEl.style.display = "block";
+    return;
+  }
+  resultsEl.innerHTML = list.map((r, i) => {
+    const region = [r.admin1, r.country].filter(Boolean).join(", ");
+    return `<div class="result-item" data-idx="${i}">
+      <span class="result-name">${r.name}</span>
+      <span class="result-region">${region}</span>
+    </div>`;
+  }).join("");
+  resultsEl.style.display = "block";
+
+  resultsEl.querySelectorAll(".result-item").forEach((el, i) => {
+    el.addEventListener("click", () => {
+      const r = list[i];
+      addCity({
+        id: r.id ? String(r.id) : (r.name + r.latitude + r.longitude),
+        name: r.name,
+        admin1: r.admin1 || "",
+        country: r.country || "",
+        lat: r.latitude,
+        lon: r.longitude,
+      });
+      searchInput.value = "";
+      resultsEl.style.display = "none";
+    });
+  });
+}
+
+function addCity(c){
+  if(cities.some(existing => existing.id === c.id)){
+    return;
+  }
+  c.color = nextColor();
+  cities.push(c);
+  renderChips();
+  syncUrl();
+  loadAndRender();
+}
+
+function removeCity(id){
+  cities = cities.filter(c => c.id !== id);
+  renderChips();
+  syncUrl();
+  loadAndRender();
+}
+
+function renderChips(){
+  const chipsEl = document.getElementById("chips");
+  if(!cities.length){
+    chipsEl.innerHTML = `<div class="chip-empty">Aucune ville sélectionnée pour l'instant — cherche-en une ci-dessus.</div>`;
+    return;
+  }
+  chipsEl.innerHTML = cities.map(c => `
+    <div class="chip">
+      <span class="dot" style="background:${c.color}"></span>
+      ${c.name}${c.country ? " · " + c.country : ""}
+      <button data-id="${c.id}" aria-label="Retirer">×</button>
+    </div>
+  `).join("");
+  chipsEl.querySelectorAll("button").forEach(btn => {
+    btn.addEventListener("click", () => removeCity(btn.dataset.id));
+  });
+}
+
+// ---------- Weather fetch + chart ----------
+async function fetchCityTemps(city){
+  const url = `https://api.open-meteo.com/v1/forecast?latitude=${city.lat}&longitude=${city.lon}&hourly=temperature_2m&forecast_days=1&timezone=auto`;
+  const res = await fetch(url);
+  if(!res.ok) throw new Error("Erreur API pour " + city.name);
+  const data = await res.json();
+  return {
+    hours: data.hourly.time.map(t => new Date(t).getHours()),
+    temps: data.hourly.temperature_2m,
+    utcOffsetSeconds: data.utc_offset_seconds,
+  };
+}
+
+function formatLocalTime(offsetSeconds){
+  if(offsetSeconds == null) return "--:--";
+  const cityMs = Date.now() + offsetSeconds * 1000;
+  const d = new Date(cityMs);
+  const hh = String(d.getUTCHours()).padStart(2, "0");
+  const mm = String(d.getUTCMinutes()).padStart(2, "0");
+  return hh + ":" + mm;
+}
+
+function localHourFor(offsetSeconds){
+  if(offsetSeconds == null) return new Date().getHours();
+  const d = new Date(Date.now() + offsetSeconds * 1000);
+  return d.getUTCHours();
+}
+
+function currentTempFor(r){
+  const hr = localHourFor(r.utcOffsetSeconds);
+  const idx = r.hours.findIndex(h => h === hr);
+  return idx >= 0 ? r.temps[idx] : r.temps[Math.floor(r.temps.length / 2)];
+}
+
+let lastResults = null;
+
+function tickClocks(){
+  if(!lastResults) return;
+  lastResults.forEach(r => {
+    const timeEl = document.getElementById("time-" + r.city.id);
+    if(timeEl) timeEl.textContent = formatLocalTime(r.utcOffsetSeconds);
+    const tempEl = document.getElementById("temp-" + r.city.id);
+    if(tempEl) tempEl.textContent = currentTempFor(r).toFixed(1);
+  });
+}
+
+async function loadAndRender(){
+  const statusEl = document.getElementById("chart-status");
+  const cardsEl = document.getElementById("cards");
+
+  if(!cities.length){
+    statusEl.style.display = "flex";
+    statusEl.textContent = "Ajoute une ville pour démarrer la comparaison.";
+    cardsEl.innerHTML = "";
+    if(chart){ chart.destroy(); chart = null; }
+    document.getElementById("updated-at").textContent = "";
+    return;
+  }
+
+  statusEl.style.display = "flex";
+  statusEl.textContent = "Récupération des données Open-Meteo…";
+
+  try{
+    const results = await Promise.all(cities.map(async city => {
+      const r = await fetchCityTemps(city);
+      return { city, ...r };
+    }));
+
+    statusEl.style.display = "none";
+
+    const labels = results[0].hours.map(h => h + "h");
+    const datasets = results.map(r => ({
+      label: r.city.name,
+      data: r.temps,
+      borderColor: r.city.color,
+      backgroundColor: r.city.color,
+      borderWidth: 2.6,
+      pointRadius: 0,
+      pointHoverRadius: 4,
+      tension: 0.35,
+      fill: false,
+    }));
+
+    if(chart) chart.destroy();
+    const ctx = document.getElementById("tempChart").getContext("2d");
+    chart = new Chart(ctx, {
+      type: "line",
+      data: { labels, datasets },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        interaction: { mode: "index", intersect: false },
+        plugins: {
+          legend: {
+            display: true,
+            position: "bottom",
+            labels: {
+              color: "#8fa4b8",
+              font: { family: "IBM Plex Mono", size: 11 },
+              boxWidth: 12, boxHeight: 3, usePointStyle: false,
+            }
+          },
+          tooltip: {
+            backgroundColor: "#132539",
+            borderColor: "#22384f",
+            borderWidth: 1,
+            titleFont: { family: "IBM Plex Mono" },
+            bodyFont: { family: "IBM Plex Mono" },
+            callbacks: {
+              label: (item) => ` ${item.dataset.label}: ${item.formattedValue}°C`
+            }
+          },
+        },
+        scales: {
+          x: {
+            grid: { color: "#1a2c40" },
+            ticks: { color: "#8fa4b8", font: { family:"IBM Plex Mono", size: 11 }, maxTicksLimit: 12 },
+          },
+          y: {
+            grid: { color: "#1a2c40" },
+            ticks: { color: "#8fa4b8", font: { family:"IBM Plex Mono", size: 11 }, callback: v => v + "°" },
+          },
+        },
+      },
+    });
+
+    cardsEl.innerHTML = results.map(r => {
+      const currentTemp = currentTempFor(r);
+      const min = Math.min(...r.temps).toFixed(1);
+      const max = Math.max(...r.temps).toFixed(1);
+      const region = [r.city.admin1, r.city.country].filter(Boolean).join(", ");
+      return `
+        <div class="card" style="--accent:${r.city.color}">
+          <div class="card-top-row">
+            <div>
+              <div class="card-city">${r.city.name}</div>
+              <div class="card-region">${region}</div>
+            </div>
+            <div class="card-time" id="time-${r.city.id}">${formatLocalTime(r.utcOffsetSeconds)}</div>
+          </div>
+          <div class="card-temp"><span id="temp-${r.city.id}">${currentTemp.toFixed(1)}</span><span class="unit">°C actuellement</span></div>
+          <div class="card-range">
+            <span>min <b>${min}°</b></span>
+            <span>max <b>${max}°</b></span>
+          </div>
+        </div>
+      `;
+    }).join("");
+
+    lastResults = results;
+    tickClocks();
+
+    const now = new Date();
+    document.getElementById("updated-at").textContent =
+      "mis à jour à " + now.toLocaleTimeString("fr-FR", {hour:"2-digit", minute:"2-digit"});
+
+  } catch(err){
+    statusEl.style.display = "flex";
+    statusEl.textContent = "Impossible de charger les données (" + err.message + ")";
+  }
+}
+
+document.getElementById("refresh-btn").addEventListener("click", loadAndRender);
+document.getElementById("share-btn").addEventListener("click", async () => {
+  syncUrl();
+  try{
+    await navigator.clipboard.writeText(window.location.href);
+    const btn = document.getElementById("share-btn");
+    const original = btn.textContent;
+    btn.textContent = "✓ Lien copié";
+    setTimeout(() => btn.textContent = original, 1800);
+  }catch(e){
+    prompt("Copie ce lien :", window.location.href);
+  }
+});
+
+// ---------- Init from URL ----------
+(function init(){
+  const params = new URLSearchParams(window.location.search);
+  const c = params.get("c");
+  if(c){
+    cities = decodeState(c);
+    colorCounter = cities.length;
+  } else {
+    // sensible default starter set
+    cities = [
+      { id:"paris", name:"Paris", admin1:"Île-de-France", country:"France", lat:48.8566, lon:2.3522, color: nextColor() },
+      { id:"marseille", name:"Marseille", admin1:"Provence-Alpes-Côte d'Azur", country:"France", lat:43.2965, lon:5.3698, color: nextColor() },
+    ];
+  }
+  renderChips();
+  loadAndRender();
+  setInterval(loadAndRender, 15 * 60 * 1000);
+  setInterval(tickClocks, 30 * 1000);
+})();
+</script>
+</body>
+</html>
