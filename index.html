@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="fr">
 <head>
@@ -325,6 +324,7 @@
   <div class="toolbar">
     <div id="updated-at"></div>
     <div class="toolbar-right">
+      <button class="btn" id="native-share-btn" onclick="nativeShareLink()">📤 Partager</button>
       <button class="btn" id="share-btn" onclick="copyShareLink()">🔗 Copier le lien</button>
       <button class="btn" id="refresh-btn">↻ Actualiser</button>
     </div>
@@ -848,6 +848,23 @@ document.getElementById("refresh-btn").addEventListener("click", () => {
   loadWorldHotspot();
   loadWorldColdspot();
 });
+function nativeShareLink(){
+  syncUrl();
+  const link = window.location.href;
+
+  if(navigator.share){
+    navigator.share({
+      title: "Comparateur de températures",
+      text: "Regarde cette comparaison de températures :",
+      url: link,
+    }).catch(() => {
+      // user cancelled the share sheet, or it failed silently — no action needed
+    });
+  } else {
+    copyShareLink();
+  }
+}
+
 function copyShareLink(){
   syncUrl();
   const link = window.location.href;
@@ -888,6 +905,7 @@ function copyShareLink(){
 }
 
 document.getElementById("share-btn").addEventListener("click", copyShareLink);
+document.getElementById("native-share-btn").addEventListener("click", nativeShareLink);
 
 // ---------- World hotspot (curated extreme-heat locations) ----------
 const HEAT_HOTSPOTS = [
