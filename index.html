@@ -292,6 +292,7 @@
       <button class="day-toggle-btn active" data-day="today">Aujourd'hui</button>
       <button class="day-toggle-btn" data-day="tomorrow">Demain</button>
       <button class="day-toggle-btn" data-day="afterTomorrow">Après-demain</button>
+      <button class="day-toggle-btn" data-day="threeDays">3 jours</button>
     </div>
   </header>
 
@@ -582,8 +583,14 @@ function renderChips(){
 }
 
 // ---------- Weather fetch + chart ----------
-let viewDay = "today"; // "today" | "tomorrow" | "afterTomorrow"
+let viewDay = "today"; // "today" | "tomorrow" | "afterTomorrow" | "threeDays"
 const DAY_OFFSETS = { today: 0, tomorrow: 1, afterTomorrow: 2 };
+
+function hourOfISO(iso){
+  // Extract the hour directly from the "YYYY-MM-DDTHH:MM" string to avoid
+  // the browser's local timezone being applied by the Date constructor.
+  return parseInt(iso.split("T")[1].split(":")[0], 10);
+}
 
 async function fetchCityTemps(city){
   let url = `https://api.open-meteo.com/v1/forecast?latitude=${city.lat}&longitude=${city.lon}&hourly=temperature_2m,weather_code,relative_humidity_2m,wind_speed_10m,wind_direction_10m&daily=sunrise,sunset&forecast_days=3&timezone=auto`;
@@ -594,13 +601,14 @@ async function fetchCityTemps(city){
   if(!res.ok) throw new Error("Erreur API pour " + city.name);
   const data = await res.json();
 
+  const isThreeDays = viewDay === "threeDays";
   const dayIdx = DAY_OFFSETS[viewDay] || 0;
-  const start = dayIdx * 24;
-  const end = start + 24;
+  const start = isThreeDays ? 0 : dayIdx * 24;
+  const end = isThreeDays ? 72 : start + 24;
   const slice = (arr) => (arr || []).slice(start, end);
 
   let solarNoon = null;
-  if(data.daily && data.daily.sunrise && data.daily.sunset){
+  if(!isThreeDays && data.daily && data.daily.sunrise && data.daily.sunset){
     const sunriseStr = data.daily.sunrise[dayIdx];
     const sunsetStr = data.daily.sunset[dayIdx];
     if(sunriseStr && sunsetStr){
@@ -616,8 +624,11 @@ async function fetchCityTemps(city){
     }
   }
 
+  const timestamps = slice(data.hourly.time);
+
   return {
-    hours: slice(data.hourly.time).map(t => new Date(t).getHours()),
+    hours: timestamps.map(hourOfISO),
+    timestamps: timestamps,
     temps: slice(data.hourly.temperature_2m),
     weatherCodes: slice(data.hourly.weather_code),
     humidity: slice(data.hourly.relative_humidity_2m),
@@ -657,7 +668,7 @@ function localHourFor(offsetSeconds){
 }
 
 function currentIndexFor(r){
-  if(viewDay !== "today"){
+  if(viewDay === "tomorrow" || viewDay === "afterTomorrow"){
     const noonIdx = r.hours.findIndex(h => h === 12);
     return noonIdx >= 0 ? noonIdx : Math.floor(r.temps.length / 2);
   }
@@ -748,7 +759,10 @@ async function loadAndRender(){
 
     statusEl.style.display = "none";
 
-    const labels = results[0].hours.map(h => h + "h");
+    const dayShortLabels = ["Auj.", "Dem.", "Aprèsdem."];
+    const labels = viewDay === "threeDays"
+      ? results[0].hours.map((h, i) => `${dayShortLabels[Math.floor(i / 24)]} ${h}h`)
+      : results[0].hours.map(h => h + "h");
     const datasets = results.map(r => ({
       label: r.city.name,
       data: r.temps,
@@ -841,11 +855,11 @@ async function loadAndRender(){
               <div class="card-city">${r.city.name}</div>
               <div class="card-region">${regionWithAlt}</div>
             </div>
-            ${viewDay === "today" ? `<div class="card-time" id="time-${r.city.id}">${formatLocalTime(r.utcOffsetSeconds)}</div>` : ""}
+            ${(viewDay === "today" || viewDay === "threeDays") ? `<div class="card-time" id="time-${r.city.id}">${formatLocalTime(r.utcOffsetSeconds)}</div>` : ""}
           </div>
           <div class="card-temp-row">
             <span class="card-icon" id="icon-${r.city.id}">${icon}</span>
-            <div class="card-temp"><span id="temp-${r.city.id}">${currentTemp.toFixed(1)}</span><span class="unit">${viewDay === "today" ? "°C actuellement" : viewDay === "tomorrow" ? "°C demain à midi" : "°C après-demain à midi"}</span></div>
+            <div class="card-temp"><span id="temp-${r.city.id}">${currentTemp.toFixed(1)}</span><span class="unit">${viewDay === "today" ? "°C actuellement" : viewDay === "tomorrow" ? "°C demain à midi" : viewDay === "afterTomorrow" ? "°C après-demain à midi" : "°C actuellement"}</span></div>
           </div>
           <div class="card-humidity">💧 humidité <b id="hum-${r.city.id}">${humidity != null ? humidity + "%" : "--"}</b></div>
           <div class="card-wind">💨 vent <b id="wind-${r.city.id}">${wind.speed != null ? wind.speed + " km/h" + (wind.direction ? " " + wind.direction : "") : "--"}</b></div>
@@ -1036,6 +1050,8 @@ function updateSubtitle(){
     subtitleEl.textContent = "Prévisions horaires de demain pour les villes sélectionnées. Tu as aussi l'heure locale.";
   } else if(viewDay === "afterTomorrow"){
     subtitleEl.textContent = "Prévisions horaires d'après-demain pour les villes sélectionnées. Tu as aussi l'heure locale.";
+  } else if(viewDay === "threeDays"){
+    subtitleEl.textContent = "Prévisions horaires sur 3 jours d'affilée, sur un seul graphique. Tu as aussi l'heure locale.";
   } else {
     subtitleEl.textContent = "Sélectionne n'importe quelle ville dans le monde et compare les températures du jour, en direct. Tu as aussi l'heure locale.";
   }
