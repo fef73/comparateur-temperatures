@@ -759,6 +759,20 @@ async function loadAndRender(){
       fill: false,
     }));
 
+    datasets.push({
+      label: "Seuil canicule (35°C)",
+      data: labels.map(() => 35),
+      borderColor: "#ff3b3b",
+      backgroundColor: "#ff3b3b",
+      borderWidth: 1.5,
+      borderDash: [7, 5],
+      pointRadius: 0,
+      pointHoverRadius: 0,
+      tension: 0,
+      fill: false,
+      order: -1,
+    });
+
     if(chart) chart.destroy();
     const ctx = document.getElementById("tempChart").getContext("2d");
     chart = new Chart(ctx, {
