@@ -54,7 +54,7 @@
     font-size:clamp(28px,4vw,42px); margin:0 0 6px; letter-spacing:-.01em;
   }
   .subtitle{color:var(--text-lo); font-size:14px; max-width:56ch;}
-  .day-toggle{display:flex; gap:8px; margin-top:14px;}
+  .day-toggle{display:flex; gap:8px; margin-top:14px; flex-wrap:wrap;}
   .day-toggle-btn{
     font-family:'IBM Plex Mono', monospace; font-size:12.5px;
     background:var(--bg-card); color:var(--text-lo); border:1px solid var(--hairline);
@@ -291,6 +291,7 @@
     <div class="day-toggle" id="day-toggle">
       <button class="day-toggle-btn active" data-day="today">Aujourd'hui</button>
       <button class="day-toggle-btn" data-day="tomorrow">Demain</button>
+      <button class="day-toggle-btn" data-day="afterTomorrow">Après-demain</button>
     </div>
   </header>
 
@@ -581,10 +582,11 @@ function renderChips(){
 }
 
 // ---------- Weather fetch + chart ----------
-let viewDay = "today"; // "today" | "tomorrow"
+let viewDay = "today"; // "today" | "tomorrow" | "afterTomorrow"
+const DAY_OFFSETS = { today: 0, tomorrow: 1, afterTomorrow: 2 };
 
 async function fetchCityTemps(city){
-  let url = `https://api.open-meteo.com/v1/forecast?latitude=${city.lat}&longitude=${city.lon}&hourly=temperature_2m,weather_code,relative_humidity_2m,wind_speed_10m,wind_direction_10m&daily=sunrise,sunset&forecast_days=2&timezone=auto`;
+  let url = `https://api.open-meteo.com/v1/forecast?latitude=${city.lat}&longitude=${city.lon}&hourly=temperature_2m,weather_code,relative_humidity_2m,wind_speed_10m,wind_direction_10m&daily=sunrise,sunset&forecast_days=3&timezone=auto`;
   if(city.elevation != null){
     url += `&elevation=${city.elevation}`;
   }
@@ -592,8 +594,8 @@ async function fetchCityTemps(city){
   if(!res.ok) throw new Error("Erreur API pour " + city.name);
   const data = await res.json();
 
-  const dayIdx = viewDay === "tomorrow" ? 1 : 0;
-  const start = viewDay === "tomorrow" ? 24 : 0;
+  const dayIdx = DAY_OFFSETS[viewDay] || 0;
+  const start = dayIdx * 24;
   const end = start + 24;
   const slice = (arr) => (arr || []).slice(start, end);
 
@@ -655,7 +657,7 @@ function localHourFor(offsetSeconds){
 }
 
 function currentIndexFor(r){
-  if(viewDay === "tomorrow"){
+  if(viewDay !== "today"){
     const noonIdx = r.hours.findIndex(h => h === 12);
     return noonIdx >= 0 ? noonIdx : Math.floor(r.temps.length / 2);
   }
@@ -759,6 +761,20 @@ async function loadAndRender(){
       fill: false,
     }));
 
+    datasets.push({
+      label: "Seuil canicule (35°C)",
+      data: labels.map(() => 35),
+      borderColor: "#ff3b3b",
+      backgroundColor: "#ff3b3b",
+      borderWidth: 1.5,
+      borderDash: [7, 5],
+      pointRadius: 0,
+      pointHoverRadius: 0,
+      tension: 0,
+      fill: false,
+      order: -1,
+    });
+
     if(chart) chart.destroy();
     const ctx = document.getElementById("tempChart").getContext("2d");
     chart = new Chart(ctx, {
@@ -829,7 +845,7 @@ async function loadAndRender(){
           </div>
           <div class="card-temp-row">
             <span class="card-icon" id="icon-${r.city.id}">${icon}</span>
-            <div class="card-temp"><span id="temp-${r.city.id}">${currentTemp.toFixed(1)}</span><span class="unit">${viewDay === "tomorrow" ? "°C demain à midi" : "°C actuellement"}</span></div>
+            <div class="card-temp"><span id="temp-${r.city.id}">${currentTemp.toFixed(1)}</span><span class="unit">${viewDay === "today" ? "°C actuellement" : viewDay === "tomorrow" ? "°C demain à midi" : "°C après-demain à midi"}</span></div>
           </div>
           <div class="card-humidity">💧 humidité <b id="hum-${r.city.id}">${humidity != null ? humidity + "%" : "--"}</b></div>
           <div class="card-wind">💨 vent <b id="wind-${r.city.id}">${wind.speed != null ? wind.speed + " km/h" + (wind.direction ? " " + wind.direction : "") : "--"}</b></div>
@@ -1016,9 +1032,13 @@ async function loadWorldColdspot(){
 
 function updateSubtitle(){
   const subtitleEl = document.getElementById("subtitle");
-  subtitleEl.textContent = viewDay === "tomorrow"
-    ? "Prévisions horaires de demain pour les villes sélectionnées. Tu as aussi l'heure locale."
-    : "Sélectionne n'importe quelle ville dans le monde et compare les températures du jour, en direct. Tu as aussi l'heure locale.";
+  if(viewDay === "tomorrow"){
+    subtitleEl.textContent = "Prévisions horaires de demain pour les villes sélectionnées. Tu as aussi l'heure locale.";
+  } else if(viewDay === "afterTomorrow"){
+    subtitleEl.textContent = "Prévisions horaires d'après-demain pour les villes sélectionnées. Tu as aussi l'heure locale.";
+  } else {
+    subtitleEl.textContent = "Sélectionne n'importe quelle ville dans le monde et compare les températures du jour, en direct. Tu as aussi l'heure locale.";
+  }
 }
 
 document.querySelectorAll(".day-toggle-btn").forEach(btn => {
