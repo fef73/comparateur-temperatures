@@ -789,6 +789,20 @@ async function loadAndRender(){
       order: -1,
     });
 
+    datasets.push({
+      label: "Seuil de gel (0°C)",
+      data: labels.map(() => 0),
+      borderColor: "#48cae4",
+      backgroundColor: "#48cae4",
+      borderWidth: 1.5,
+      borderDash: [7, 5],
+      pointRadius: 0,
+      pointHoverRadius: 0,
+      tension: 0,
+      fill: false,
+      order: -1,
+    });
+
     if(chart) chart.destroy();
     const ctx = document.getElementById("tempChart").getContext("2d");
     chart = new Chart(ctx, {
