@@ -846,6 +846,7 @@ async function loadAndRender(){
             borderWidth: 1,
             titleFont: { family: "IBM Plex Mono" },
             bodyFont: { family: "IBM Plex Mono" },
+            filter: (item) => item.dataset.label !== "Seuil canicule (35°C)" && item.dataset.label !== "Seuil de gel (0°C)",
             callbacks: {
               label: (item) => {
                 const codes = item.dataset.weatherCodes;
