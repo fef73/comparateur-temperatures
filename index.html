@@ -232,6 +232,10 @@
     padding:12px 14px; font-size:11.5px;
   }
   footer .tip b{color:var(--live); font-weight:600;}
+  footer .tip code{
+    background:var(--bg-input); border:1px solid var(--hairline); border-radius:4px;
+    padding:1px 5px; color:var(--text-hi); font-size:11px;
+  }
 
   .hotspot-banner{
     margin-top:22px; display:flex; gap:14px; align-items:flex-start;
@@ -365,11 +369,17 @@
   <footer>
     Source : Open-Meteo.com (géocodage + prévisions horaires, sans clé API) · Fuseau horaire local à chaque ville<br>
     Le lien partagé conserve ta sélection de villes
-    <div style="margin-top:8px; opacity:.5;">build : 2026-07-22-share-fix-2</div>
+    <div style="margin-top:8px; opacity:.5;">build : 2026-08-17-tooltip-icons</div>
     <div class="tip">
       💡 Astuce — comparer plusieurs altitudes de la même ville : ajoute-la, saisis une altitude puis clique <b>Valider</b> ;
       le panneau reste ouvert, saisis une autre altitude et clique à nouveau <b>Valider</b> — répète autant de fois que voulu,
       puis ferme le panneau avec le <b>×</b>.
+    </div>
+    <div class="tip">
+      💡 Accès direct par API (ex : raccourci, appli mobile) — passe des coordonnées GPS dans l'URL au lieu de chercher une ville :<br>
+      <code>?lat=45.9237&amp;lon=6.8694&amp;alt=1035&amp;nom=Chamonix</code> (<code>alt</code> et <code>nom</code> sont optionnels)<br>
+      Plusieurs points d'un coup, séparés par <code>;</code>, chacun au format <code>lat,lon,alt,nom</code> :<br>
+      <code>?points=45.9237,6.8694,1035,Chamonix;48.8566,2.3522,,Paris</code>
     </div>
   </footer>
 </div>
@@ -766,6 +776,7 @@ async function loadAndRender(){
     const datasets = results.map(r => ({
       label: r.city.name,
       data: r.temps,
+      weatherCodes: r.weatherCodes,
       borderColor: r.city.color,
       backgroundColor: r.city.color,
       borderWidth: 2.6,
@@ -836,7 +847,11 @@ async function loadAndRender(){
             titleFont: { family: "IBM Plex Mono" },
             bodyFont: { family: "IBM Plex Mono" },
             callbacks: {
-              label: (item) => ` ${truncateName(item.dataset.label, 10)}: ${item.formattedValue}°C`
+              label: (item) => {
+                const codes = item.dataset.weatherCodes;
+                const icon = codes ? weatherEmoji(codes[item.dataIndex]) + " " : "";
+                return ` ${icon}${truncateName(item.dataset.label, 10)}: ${item.formattedValue}°C`;
+              }
             }
           },
         },
@@ -1084,6 +1099,71 @@ document.querySelectorAll(".day-toggle-btn").forEach(btn => {
 // ---------- Init from URL ----------
 (function init(){
   const params = new URLSearchParams(window.location.search);
+
+  // Accès simple par API (ex : appli mobile, raccourci) : passe directement des coordonnées
+  // GPS plutôt qu'un nom de ville. Ex :
+  // ?lat=45.9237&lon=6.8694&alt=1035&nom=Chamonix
+  // - lat, lon : obligatoires (degrés décimaux)
+  // - alt      : optionnel, en mètres (corrige la température pour ce point précis)
+  // - nom      : optionnel, nom affiché (sinon "Position GPS")
+  // Plusieurs points peuvent être ajoutés d'un coup en les séparant par des points-virgules,
+  // chaque point étant "lat,lon,alt,nom" (alt et nom restant optionnels) :
+  // ?points=45.9237,6.8694,1035,Chamonix;48.8566,2.3522,,Paris
+  const latParam = params.get("lat");
+  const lonParam = params.get("lon");
+  const pointsParam = params.get("points");
+
+  function buildCityFromCoords(lat, lon, alt, nom){
+    return {
+      id: uniqueId(),
+      name: nom || "Position GPS",
+      admin1: "",
+      country: "",
+      lat, lon,
+      elevation: (alt !== null && alt !== undefined && !isNaN(alt)) ? alt : null,
+      color: nextColor(),
+    };
+  }
+
+  let apiCities = null;
+
+  if(pointsParam){
+    apiCities = pointsParam.split(";").map(entry => {
+      const [latS, lonS, altS, ...nomParts] = entry.split(",");
+      const lat = parseFloat(latS);
+      const lon = parseFloat(lonS);
+      if(isNaN(lat) || isNaN(lon)) return null;
+      const alt = altS !== undefined && altS !== "" ? parseFloat(altS) : null;
+      const nom = nomParts.length ? decodeURIComponent(nomParts.join(",")) : "";
+      return buildCityFromCoords(lat, lon, alt, nom);
+    }).filter(Boolean);
+    if(!apiCities.length) apiCities = null;
+  } else if(latParam !== null && lonParam !== null && !isNaN(parseFloat(latParam)) && !isNaN(parseFloat(lonParam))){
+    const altParam = params.get("alt");
+    apiCities = [buildCityFromCoords(
+      parseFloat(latParam),
+      parseFloat(lonParam),
+      altParam !== null ? parseFloat(altParam) : null,
+      params.get("nom")
+    )];
+  }
+
+  if(apiCities){
+    cities = apiCities;
+    colorCounter = cities.length;
+    updateSubtitle();
+    renderChips();
+    loadAndRender();
+    loadWorldHotspot();
+    loadWorldColdspot();
+    setInterval(loadAndRender, 15 * 60 * 1000);
+    setInterval(tickClocks, 30 * 1000);
+    setInterval(loadWorldHotspot, 30 * 60 * 1000);
+    setInterval(loadWorldColdspot, 30 * 60 * 1000);
+    return;
+  }
+
+  // Lien de partage généré par le site lui-même (bouton "Copier le lien")
   const c = params.get("c");
   if(c){
     cities = decodeState(c);
