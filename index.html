@@ -297,6 +297,7 @@
       <button class="day-toggle-btn" data-day="tomorrow">Demain</button>
       <button class="day-toggle-btn" data-day="afterTomorrow">Après-demain</button>
       <button class="day-toggle-btn" data-day="threeDays">3 jours</button>
+      <button class="day-toggle-btn" data-day="sevenDays">7 jours</button>
     </div>
   </header>
 
@@ -603,7 +604,10 @@ function hourOfISO(iso){
 }
 
 async function fetchCityTemps(city){
-  let url = `https://api.open-meteo.com/v1/forecast?latitude=${city.lat}&longitude=${city.lon}&hourly=temperature_2m,weather_code,relative_humidity_2m,wind_speed_10m,wind_direction_10m&daily=sunrise,sunset&forecast_days=3&timezone=auto`;
+  const isMultiDay = viewDay === "threeDays" || viewDay === "sevenDays";
+  const numDays = viewDay === "sevenDays" ? 7 : viewDay === "threeDays" ? 3 : 1;
+  const forecastDays = Math.max(3, numDays); // au moins 3 pour couvrir l'après-demain
+  let url = `https://api.open-meteo.com/v1/forecast?latitude=${city.lat}&longitude=${city.lon}&hourly=temperature_2m,weather_code,relative_humidity_2m,wind_speed_10m,wind_direction_10m&daily=sunrise,sunset&forecast_days=${forecastDays}&timezone=auto`;
   if(city.elevation != null){
     url += `&elevation=${city.elevation}`;
   }
@@ -611,14 +615,13 @@ async function fetchCityTemps(city){
   if(!res.ok) throw new Error("Erreur API pour " + city.name);
   const data = await res.json();
 
-  const isThreeDays = viewDay === "threeDays";
   const dayIdx = DAY_OFFSETS[viewDay] || 0;
-  const start = isThreeDays ? 0 : dayIdx * 24;
-  const end = isThreeDays ? 72 : start + 24;
+  const start = isMultiDay ? 0 : dayIdx * 24;
+  const end = isMultiDay ? numDays * 24 : start + 24;
   const slice = (arr) => (arr || []).slice(start, end);
 
   let solarNoon = null;
-  if(!isThreeDays && data.daily && data.daily.sunrise && data.daily.sunset){
+  if(!isMultiDay && data.daily && data.daily.sunrise && data.daily.sunset){
     const sunriseStr = data.daily.sunrise[dayIdx];
     const sunsetStr = data.daily.sunset[dayIdx];
     if(sunriseStr && sunsetStr){
@@ -769,8 +772,16 @@ async function loadAndRender(){
 
     statusEl.style.display = "none";
 
+    const WEEKDAYS_SHORT = ["dim","lun","mar","mer","jeu","ven","sam"];
     const dayShortLabels = ["Auj.", "Dem.", "Aprèsdem."];
-    const labels = viewDay === "threeDays"
+    const labels = viewDay === "sevenDays"
+      ? results[0].timestamps.map(t => {
+          const [datePart, timePart] = t.split("T");
+          const [y, m, d] = datePart.split("-").map(Number);
+          const wd = WEEKDAYS_SHORT[new Date(y, m - 1, d).getDay()];
+          return `${wd} ${timePart.split(":")[0]}h`;
+        })
+      : viewDay === "threeDays"
       ? results[0].hours.map((h, i) => `${dayShortLabels[Math.floor(i / 24)]} ${h}h`)
       : results[0].hours.map(h => h + "h");
     const datasets = results.map(r => ({
@@ -885,7 +896,7 @@ async function loadAndRender(){
               <div class="card-city">${r.city.name}</div>
               <div class="card-region">${regionWithAlt}</div>
             </div>
-            ${(viewDay === "today" || viewDay === "threeDays") ? `<div class="card-time" id="time-${r.city.id}">${formatLocalTime(r.utcOffsetSeconds)}</div>` : ""}
+            ${(viewDay === "today" || viewDay === "threeDays" || viewDay === "sevenDays") ? `<div class="card-time" id="time-${r.city.id}">${formatLocalTime(r.utcOffsetSeconds)}</div>` : ""}
           </div>
           <div class="card-temp-row">
             <span class="card-icon" id="icon-${r.city.id}">${icon}</span>
@@ -1082,6 +1093,8 @@ function updateSubtitle(){
     subtitleEl.textContent = "Prévisions horaires d'après-demain pour les villes sélectionnées. Tu as aussi l'heure locale.";
   } else if(viewDay === "threeDays"){
     subtitleEl.textContent = "Prévisions horaires sur 3 jours d'affilée, sur un seul graphique. Tu as aussi l'heure locale.";
+  } else if(viewDay === "sevenDays"){
+    subtitleEl.textContent = "Prévisions horaires sur 7 jours d'affilée, sur un seul graphique. Au-delà de 2-3 jours, la précision d'Open-Meteo diminue — à prendre comme une tendance plutôt qu'une prévision fine.";
   } else {
     subtitleEl.textContent = "Sélectionne n'importe quelle ville dans le monde et compare les températures du jour, en direct. Tu as aussi l'heure locale.";
   }
