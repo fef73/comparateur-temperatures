@@ -207,6 +207,28 @@
   }
   .card-range b{color:var(--text-hi); font-weight:500;}
 
+  .card-yearly{
+    display:flex; justify-content:space-between; font-family:'IBM Plex Mono', monospace;
+    font-size:11.5px; color:var(--text-lo); margin-top:0; border-top:none; padding-top:6px;
+  }
+  .card-yearly b{color:var(--text-hi); font-weight:500;}
+  .card-yearly .cy-label{white-space:nowrap;}
+  .card-yearly-header{
+    display:flex; align-items:center; gap:6px; margin-top:10px; padding-top:9px;
+    border-top:1px solid var(--hairline);
+    font-family:'IBM Plex Mono', monospace; font-size:10.5px; letter-spacing:.02em;
+    color:var(--text-lo); text-transform:uppercase;
+  }
+  .card-yearly-header .cy-info{
+    cursor:help; opacity:.75; border:1px solid var(--hairline); border-radius:50%;
+    width:14px; height:14px; display:inline-flex; align-items:center; justify-content:center;
+    font-size:9.5px; font-style:normal; flex:none;
+  }
+  .card-yearly-note{
+    font-family:'IBM Plex Mono', monospace; font-size:11.5px; color:var(--text-lo);
+    opacity:.9; margin-top:6px; line-height:1.4;
+  }
+
   .toolbar{
     display:flex; justify-content:space-between; align-items:center; gap:12px;
     margin-bottom:14px; flex-wrap:wrap;
@@ -603,6 +625,104 @@ function hourOfISO(iso){
   return parseInt(iso.split("T")[1].split(":")[0], 10);
 }
 
+// Clé de cache stable par coordonnées (résiste à la suppression/ré-ajout d'une même ville,
+// contrairement à city.id qui change à chaque ajout).
+function yearlyStatsKey(city){
+  return `${city.lat.toFixed(3)},${city.lon.toFixed(3)},${city.elevation ?? ""}`;
+}
+
+// Récupère (avec cache) le nombre de jours de canicule (Tmax >= 35°C), de gel (Tmin <= 0°C)
+// et de vent fort (rafale max journalière >= 60 km/h) sur les 365 derniers jours, via l'API
+// archive d'Open-Meteo.
+const historicalStatsCache = {};
+const CANICULE_SEUIL_ANNUEL = 35;
+const GEL_SEUIL_ANNUEL = 0;
+const VENT_SEUIL_ANNUEL = 60; // km/h, en rafale
+function getYearlyExtremeStats(city){
+  const key = yearlyStatsKey(city);
+  if(historicalStatsCache[key]) return Promise.resolve(historicalStatsCache[key]);
+
+  const toISODate = (d) => d.toISOString().slice(0, 10);
+  const today = new Date();
+  const endDate = new Date(today); endDate.setDate(endDate.getDate() - 2); // marge : données archive récentes pas toujours dispo
+  const startDate = new Date(endDate); startDate.setDate(startDate.getDate() - 365);
+
+  const url = `https://archive-api.open-meteo.com/v1/archive?latitude=${city.lat}&longitude=${city.lon}` +
+    `&start_date=${toISODate(startDate)}&end_date=${toISODate(endDate)}` +
+    `&daily=temperature_2m_max,temperature_2m_min,wind_gusts_10m_max&timezone=auto`;
+
+  const promise = fetch(url)
+    .then(res => {
+      if(!res.ok) throw new Error("Erreur API archive pour " + city.name);
+      return res.json();
+    })
+    .then(data => {
+      const max = data.daily.temperature_2m_max || [];
+      const min = data.daily.temperature_2m_min || [];
+      const wind = data.daily.wind_gusts_10m_max || [];
+      const canicule = max.filter(v => v != null && v >= CANICULE_SEUIL_ANNUEL).length;
+      const gel = min.filter(v => v != null && v <= GEL_SEUIL_ANNUEL).length;
+      const ventFort = wind.filter(v => v != null && v >= VENT_SEUIL_ANNUEL).length;
+      const stats = { canicule, gel, ventFort, days: max.length };
+      historicalStatsCache[key] = stats;
+      return stats;
+    })
+    .catch(err => {
+      delete historicalStatsCache[key];
+      throw err;
+    });
+
+  historicalStatsCache[key] = promise;
+  return promise;
+}
+
+// Récupère (avec cache) le nombre de jours de mauvaise qualité de l'air (indice européen AQI >= 60)
+// sur les 365 derniers jours, via l'API qualité de l'air d'Open-Meteo.
+const aqiStatsCache = {};
+const AQI_SEUIL_ANNUEL = 60; // échelle European AQI d'Open-Meteo : 60 = "mauvaise" qualité d'air et au-delà
+function getYearlyAqiStats(city){
+  const key = yearlyStatsKey(city);
+  if(aqiStatsCache[key]) return Promise.resolve(aqiStatsCache[key]);
+
+  const toISODate = (d) => d.toISOString().slice(0, 10);
+  const today = new Date();
+  const endDate = new Date(today); endDate.setDate(endDate.getDate() - 2);
+  const startDate = new Date(endDate); startDate.setDate(startDate.getDate() - 365);
+
+  const url = `https://air-quality-api.open-meteo.com/v1/air-quality?latitude=${city.lat}&longitude=${city.lon}` +
+    `&start_date=${toISODate(startDate)}&end_date=${toISODate(endDate)}` +
+    `&hourly=european_aqi&timezone=auto`;
+
+  const promise = fetch(url)
+    .then(res => {
+      if(!res.ok) throw new Error("Erreur API qualité de l'air pour " + city.name);
+      return res.json();
+    })
+    .then(data => {
+      const times = (data.hourly && data.hourly.time) || [];
+      const values = (data.hourly && data.hourly.european_aqi) || [];
+      const dailyMax = {};
+      times.forEach((t, i) => {
+        const day = t.slice(0, 10);
+        const v = values[i];
+        if(v == null) return;
+        if(dailyMax[day] == null || v > dailyMax[day]) dailyMax[day] = v;
+      });
+      const dayValues = Object.values(dailyMax);
+      const aqiJours = dayValues.filter(v => v >= AQI_SEUIL_ANNUEL).length;
+      const stats = { aqiJours, days: dayValues.length };
+      aqiStatsCache[key] = stats;
+      return stats;
+    })
+    .catch(err => {
+      delete aqiStatsCache[key];
+      throw err;
+    });
+
+  aqiStatsCache[key] = promise;
+  return promise;
+}
+
 async function fetchCityTemps(city){
   const isMultiDay = viewDay === "threeDays" || viewDay === "sevenDays";
   const numDays = viewDay === "sevenDays" ? 7 : viewDay === "threeDays" ? 3 : 1;
@@ -909,12 +1029,61 @@ async function loadAndRender(){
             <span>min <b>${min}°</b></span>
             <span>max <b>${max}°</b></span>
           </div>
+          <div class="card-yearly-header">
+            <span>Extrêmes sur 365 jours</span>
+            <i class="cy-info" title="Nombre de jours, sur les 365 derniers jours, où : la température maximale a atteint ${CANICULE_SEUIL_ANNUEL}°C ou plus (canicule) ; la température minimale est descendue à ${GEL_SEUIL_ANNUEL}°C ou moins (gel) ; la rafale de vent maximale a atteint ${VENT_SEUIL_ANNUEL} km/h ou plus (vent fort) ; l'indice de qualité de l'air européen a atteint ${AQI_SEUIL_ANNUEL} ou plus (pollution). Données historiques Open-Meteo, mesurées à l'emplacement exact de cette ville.">i</i>
+          </div>
+          <div class="card-yearly" title="Jours où la température maximale a atteint ${CANICULE_SEUIL_ANNUEL}°C ou plus, sur les 365 derniers jours.">
+            <span class="cy-label">🔥 canicule (≥${CANICULE_SEUIL_ANNUEL}°C)</span>
+            <b id="yearly-canicule-${r.city.id}">…</b>
+          </div>
+          <div class="card-yearly" title="Jours où la température minimale est descendue à ${GEL_SEUIL_ANNUEL}°C ou moins, sur les 365 derniers jours.">
+            <span class="cy-label">❄️ gel (≤${GEL_SEUIL_ANNUEL}°C)</span>
+            <b id="yearly-gel-${r.city.id}">…</b>
+          </div>
+          <div class="card-yearly" title="Jours où la rafale de vent maximale a atteint ${VENT_SEUIL_ANNUEL} km/h ou plus, sur les 365 derniers jours.">
+            <span class="cy-label">💨 vent fort (rafales ≥${VENT_SEUIL_ANNUEL} km/h)</span>
+            <b id="yearly-vent-${r.city.id}">…</b>
+          </div>
+          <div class="card-yearly" title="Jours où l'indice de qualité de l'air européen (AQI) a atteint ${AQI_SEUIL_ANNUEL} ou plus (mauvaise qualité d'air et au-delà), sur les 365 derniers jours.">
+            <span class="cy-label">🌫️ pollution (AQI ≥${AQI_SEUIL_ANNUEL})</span>
+            <b id="yearly-aqi-${r.city.id}">…</b>
+          </div>
+          <div class="card-yearly-note">Sur les 365 derniers jours, à cet endroit précis (archives Open-Meteo)</div>
         </div>
       `;
     }).join("");
 
     lastResults = results;
     tickClocks();
+
+    // charge (avec cache par coordonnées, une seule fois par ville) les statistiques
+    // annuelles de canicule/gel/vent fort/pollution, et remplit les cartes dès réponse
+    results.forEach(r => {
+      getYearlyExtremeStats(r.city).then(stats => {
+        const caniculeEl = document.getElementById("yearly-canicule-" + r.city.id);
+        const gelEl = document.getElementById("yearly-gel-" + r.city.id);
+        const ventEl = document.getElementById("yearly-vent-" + r.city.id);
+        if(caniculeEl) caniculeEl.textContent = stats.canicule;
+        if(gelEl) gelEl.textContent = stats.gel;
+        if(ventEl) ventEl.textContent = stats.ventFort;
+      }).catch(() => {
+        const caniculeEl = document.getElementById("yearly-canicule-" + r.city.id);
+        const gelEl = document.getElementById("yearly-gel-" + r.city.id);
+        const ventEl = document.getElementById("yearly-vent-" + r.city.id);
+        if(caniculeEl) caniculeEl.textContent = "--";
+        if(gelEl) gelEl.textContent = "--";
+        if(ventEl) ventEl.textContent = "--";
+      });
+
+      getYearlyAqiStats(r.city).then(stats => {
+        const aqiEl = document.getElementById("yearly-aqi-" + r.city.id);
+        if(aqiEl) aqiEl.textContent = stats.aqiJours;
+      }).catch(() => {
+        const aqiEl = document.getElementById("yearly-aqi-" + r.city.id);
+        if(aqiEl) aqiEl.textContent = "--";
+      });
+    });
 
     const now = new Date();
     document.getElementById("updated-at").textContent =
