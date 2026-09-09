@@ -418,7 +418,7 @@
   <div class="altitude-prompt" id="altitude-prompt" style="display:none;">
     <div class="altitude-prompt-header">
       <div class="altitude-prompt-text">
-        Altitude précise pour <b id="altitude-city-name"></b> <span class="altitude-prompt-sub">(optionnel — corrige la température pour un point en altitude, ex : station de ski)</span>
+        <span id="altitude-prompt-prefix">Altitude précise pour</span> <b id="altitude-city-name"></b> <span class="altitude-prompt-sub">(optionnel — corrige la température pour un point en altitude, ex : station de ski)</span>
       </div>
       <button class="altitude-close-btn" id="altitude-close-btn" aria-label="Fermer">×</button>
     </div>
@@ -686,6 +686,8 @@ function applyStaticTranslations(){
   searchInput.placeholder = t("searchPlaceholder");
   document.getElementById("search-loading").textContent = t("searchLoading");
   document.getElementById("altitude-close-btn").setAttribute("aria-label", t("altitudeClose"));
+  const altPrefix = document.getElementById("altitude-prompt-prefix");
+  if(altPrefix) altPrefix.textContent = t("altitudePromptPrefix");
   document.getElementById("altitude-input").placeholder = t("altitudePlaceholder");
   document.getElementById("altitude-skip-btn").textContent = t("altitudeSkip");
   document.getElementById("altitude-confirm-btn").textContent = t("altitudeConfirm");
