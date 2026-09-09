@@ -1229,11 +1229,11 @@ const PERIOD_CANICULE_SEUIL = 35;
 const PERIOD_GEL_SEUIL = 0;
 
 function periodLabel(){
-  if(viewDay === "tomorrow") return "demain";
-  if(viewDay === "afterTomorrow") return "après-demain";
-  if(viewDay === "threeDays") return "sur les 3 prochains jours";
-  if(viewDay === "sevenDays") return "sur les 7 prochains jours";
-  return "aujourd'hui";
+  if(viewDay === "tomorrow") return t("periodTomorrow");
+  if(viewDay === "afterTomorrow") return t("periodAfterTomorrow");
+  if(viewDay === "threeDays") return t("periodThreeDays");
+  if(viewDay === "sevenDays") return t("periodSevenDays");
+  return t("periodToday");
 }
 
 function periodCityLabel(city){
@@ -1258,19 +1258,19 @@ function buildPeriodBulletin(results){
   const coldest = stats.reduce((a, b) => b.min < a.min ? b : a);
   const label = periodLabel();
 
-  let summaryText = `${periodCityLabel(hottest.city)} tient la tête ${label} avec ${hottest.max.toFixed(1)}°C`;
+  let summaryText = t("bulletinLead", periodCityLabel(hottest.city), hottest.max.toFixed(1), label);
   if(coldest.city.id !== hottest.city.id){
-    summaryText += `, tandis que ${periodCityLabel(coldest.city)} est la plus fraîche avec ${coldest.min.toFixed(1)}°C`;
+    summaryText += t("bulletinColdSuffix", periodCityLabel(coldest.city), coldest.min.toFixed(1));
   }
   summaryText += ".";
 
   const alerts = [];
   stats.forEach(s => {
     if(s.max >= PERIOD_CANICULE_SEUIL){
-      alerts.push({ type: "canicule", icon: "🔥", text: `${periodCityLabel(s.city)} : pic à ${s.max.toFixed(1)}°C ${label}, seuil canicule (${PERIOD_CANICULE_SEUIL}°C) dépassé.` });
+      alerts.push({ type: "canicule", icon: "🔥", text: t("bulletinCaniculeAlert", periodCityLabel(s.city), s.max.toFixed(1), label, PERIOD_CANICULE_SEUIL) });
     }
     if(s.min <= PERIOD_GEL_SEUIL){
-      alerts.push({ type: "gel", icon: "❄️", text: `${periodCityLabel(s.city)} : minimale de ${s.min.toFixed(1)}°C ${label}, risque de gel.` });
+      alerts.push({ type: "gel", icon: "❄️", text: t("bulletinGelAlert", periodCityLabel(s.city), s.min.toFixed(1), label) });
     }
   });
 
@@ -1281,7 +1281,7 @@ function buildPeriodBulletin(results){
     : "";
 
   el.innerHTML = `
-    <div class="bulletin-header">📅 bulletin — ${label}</div>
+    <div class="bulletin-header">${t("bulletinHeader", label)}</div>
     <div class="bulletin-summary">${summaryText}</div>
     ${alertsHtml}
     <div class="bulletin-aqi-history" id="bulletin-aqi-history"></div>
@@ -1292,7 +1292,7 @@ function buildPeriodBulletin(results){
 
 function dayAbbrev(dateStr){
   const d = new Date(dateStr + "T12:00:00");
-  return d.toLocaleDateString("fr-FR", { weekday: "short" }).replace(".", "");
+  return d.toLocaleDateString(lang === "en" ? "en-US" : "fr-FR", { weekday: "short" }).replace(".", "");
 }
 
 function renderRecentAqiHistory(results){
@@ -1318,14 +1318,14 @@ function renderRecentAqiHistory(results){
       ).join("");
       return `
         <div class="aqi-city-row">
-          <span class="aqi-city-name">${cityLabel}${stats.exceededCount > 0 ? ` · ${stats.exceededCount}/7 j ≥${AQI_SEUIL_ANNUEL}` : ""}</span>
+          <span class="aqi-city-name">${cityLabel}${stats.exceededCount > 0 ? t("aqiHistoryCount", stats.exceededCount, AQI_SEUIL_ANNUEL) : ""}</span>
           <span class="aqi-chips">${chips}</span>
         </div>
       `;
     }).join("");
 
     container.innerHTML = `
-      <div class="bulletin-aqi-header">🌫️ historique pollution — 7 derniers jours (AQI ≥ ${AQI_SEUIL_ANNUEL})</div>
+      <div class="bulletin-aqi-header">${t("aqiHistoryHeader", AQI_SEUIL_ANNUEL)}</div>
       ${rowsHtml}
     `;
   });
