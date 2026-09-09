@@ -237,6 +237,57 @@
     opacity:.9; margin-top:6px; line-height:1.4;
   }
 
+  .bulletin{
+    background:var(--bg-panel); border:1px solid var(--hairline); border-radius:16px;
+    padding:20px 22px 22px; margin-top:22px;
+  }
+  .bulletin:empty{display:none;}
+  .bulletin-header{
+    font-family:'IBM Plex Mono', monospace; font-size:12px; letter-spacing:.1em; text-transform:uppercase;
+    color:var(--live); margin-bottom:10px; display:flex; align-items:center; gap:8px;
+  }
+  .bulletin-summary{
+    font-size:14.5px; line-height:1.65; color:var(--text-hi); max-width:70ch;
+  }
+  .bulletin-alerts{
+    display:flex; flex-direction:column; gap:8px; margin-top:14px;
+  }
+  .bulletin-alert{
+    display:flex; align-items:center; gap:10px;
+    font-family:'IBM Plex Mono', monospace; font-size:12.5px; line-height:1.4;
+    padding:10px 12px; border-radius:10px; border:1px solid var(--hairline);
+    background:rgba(255,255,255,0.02);
+  }
+  .bulletin-alert-icon{font-size:16px; flex:none;}
+  .bulletin-alert-canicule{ border-color:rgba(230,57,70,.4); color:#ffb4ab; background:rgba(230,57,70,.08); }
+  .bulletin-alert-gel{ border-color:rgba(72,202,228,.4); color:#a8e8f7; background:rgba(72,202,228,.08); }
+  .bulletin-alert-pollution{ border-color:rgba(143,164,184,.4); color:var(--text-lo); background:rgba(143,164,184,.1); }
+
+  .bulletin-aqi-history{
+    margin-top:16px; padding-top:14px; border-top:1px solid var(--hairline);
+  }
+  .bulletin-aqi-history:empty{display:none;}
+  .bulletin-aqi-header{
+    font-family:'IBM Plex Mono', monospace; font-size:11px; letter-spacing:.08em; text-transform:uppercase;
+    color:var(--text-lo); margin-bottom:10px;
+  }
+  .aqi-city-row{
+    display:flex; align-items:center; gap:12px; margin-bottom:9px; flex-wrap:wrap;
+  }
+  .aqi-city-row:last-child{margin-bottom:0;}
+  .aqi-city-name{
+    font-size:12px; font-family:'IBM Plex Mono', monospace; color:var(--text-hi); min-width:150px;
+  }
+  .aqi-chips{display:flex; gap:5px; flex-wrap:wrap;}
+  .aqi-chip{
+    font-family:'IBM Plex Mono', monospace; font-size:10px; line-height:1.35; text-align:center;
+    color:var(--text-lo); background:rgba(255,255,255,.03); border:1px solid var(--hairline);
+    border-radius:8px; padding:4px 6px; min-width:28px;
+  }
+  .aqi-chip-bad{
+    color:#e8ecef; background:rgba(143,164,184,.18); border-color:rgba(143,164,184,.55); font-weight:600;
+  }
+
   .toolbar{
     display:flex; justify-content:space-between; align-items:center; gap:12px;
     margin-bottom:14px; flex-wrap:wrap;
@@ -380,6 +431,8 @@
   </div>
 
   <div class="cards" id="cards"></div>
+
+  <div class="bulletin" id="bulletin-period"></div>
 
   <div class="hotspot-banner" id="hotspot-banner">
     <div class="hotspot-icon">🔥</div>
@@ -925,6 +978,113 @@ function truncateName(name, max = 10){
   return name.length > max ? name.slice(0, max - 1) + "…" : name;
 }
 
+// Seuils utilisés pour les alertes du bulletin de la période sélectionnée (aujourd'hui/demain/etc.)
+const PERIOD_CANICULE_SEUIL = 35;
+const PERIOD_GEL_SEUIL = 0;
+
+function periodLabel(){
+  if(viewDay === "tomorrow") return "demain";
+  if(viewDay === "afterTomorrow") return "après-demain";
+  if(viewDay === "threeDays") return "sur les 3 prochains jours";
+  if(viewDay === "sevenDays") return "sur les 7 prochains jours";
+  return "aujourd'hui";
+}
+
+function periodCityLabel(city){
+  const region = [city.admin1, city.country].filter(Boolean).join(", ");
+  return region ? `${city.name} (${region})` : city.name;
+}
+
+// Bulletin synchrone basé uniquement sur les données déjà récupérées pour la période
+// actuellement sélectionnée (pas d'appel API supplémentaire).
+function buildPeriodBulletin(results){
+  const el = document.getElementById("bulletin-period");
+  if(!el) return;
+  if(!results || !results.length){ el.innerHTML = ""; return; }
+
+  const stats = results.map(r => ({
+    city: r.city,
+    max: Math.max(...r.temps),
+    min: Math.min(...r.temps),
+  }));
+
+  const hottest = stats.reduce((a, b) => b.max > a.max ? b : a);
+  const coldest = stats.reduce((a, b) => b.min < a.min ? b : a);
+  const label = periodLabel();
+
+  let summaryText = `${periodCityLabel(hottest.city)} tient la tête ${label} avec ${hottest.max.toFixed(1)}°C`;
+  if(coldest.city.id !== hottest.city.id){
+    summaryText += `, tandis que ${periodCityLabel(coldest.city)} est la plus fraîche avec ${coldest.min.toFixed(1)}°C`;
+  }
+  summaryText += ".";
+
+  const alerts = [];
+  stats.forEach(s => {
+    if(s.max >= PERIOD_CANICULE_SEUIL){
+      alerts.push({ type: "canicule", icon: "🔥", text: `${periodCityLabel(s.city)} : pic à ${s.max.toFixed(1)}°C ${label}, seuil canicule (${PERIOD_CANICULE_SEUIL}°C) dépassé.` });
+    }
+    if(s.min <= PERIOD_GEL_SEUIL){
+      alerts.push({ type: "gel", icon: "❄️", text: `${periodCityLabel(s.city)} : minimale de ${s.min.toFixed(1)}°C ${label}, risque de gel.` });
+    }
+  });
+
+  const alertsHtml = alerts.length
+    ? `<div class="bulletin-alerts">${alerts.map(a =>
+        `<div class="bulletin-alert bulletin-alert-${a.type}"><span class="bulletin-alert-icon">${a.icon}</span>${a.text}</div>`
+      ).join("")}</div>`
+    : "";
+
+  el.innerHTML = `
+    <div class="bulletin-header">📅 bulletin — ${label}</div>
+    <div class="bulletin-summary">${summaryText}</div>
+    ${alertsHtml}
+    <div class="bulletin-aqi-history" id="bulletin-aqi-history"></div>
+  `;
+
+  renderRecentAqiHistory(results);
+}
+
+function dayAbbrev(dateStr){
+  const d = new Date(dateStr + "T12:00:00");
+  return d.toLocaleDateString("fr-FR", { weekday: "short" }).replace(".", "");
+}
+
+function renderRecentAqiHistory(results){
+  const container = document.getElementById("bulletin-aqi-history");
+  if(!container) return;
+
+  Promise.all(results.map(r =>
+    getRecentAqiHistory(r.city).then(stats => ({ city: r.city, stats, error: null }))
+      .catch(err => ({ city: r.city, stats: null, error: err }))
+  )).then(entries => {
+    const rowsHtml = entries.map(({ city, stats }) => {
+      const cityLabel = periodCityLabel(city);
+      if(!stats){
+        return `
+          <div class="aqi-city-row">
+            <span class="aqi-city-name">${cityLabel}</span>
+            <span class="aqi-chip">--</span>
+          </div>
+        `;
+      }
+      const chips = stats.days.map(d =>
+        `<span class="aqi-chip${d.exceeded ? " aqi-chip-bad" : ""}" title="${dayAbbrev(d.date)} ${d.date} · AQI ${d.aqiMax}">${dayAbbrev(d.date)}<br>${d.aqiMax}</span>`
+      ).join("");
+      return `
+        <div class="aqi-city-row">
+          <span class="aqi-city-name">${cityLabel}${stats.exceededCount > 0 ? ` · ${stats.exceededCount}/7 j ≥${AQI_SEUIL_ANNUEL}` : ""}</span>
+          <span class="aqi-chips">${chips}</span>
+        </div>
+      `;
+    }).join("");
+
+    container.innerHTML = `
+      <div class="bulletin-aqi-header">🌫️ historique pollution — 7 derniers jours (AQI ≥ ${AQI_SEUIL_ANNUEL})</div>
+      ${rowsHtml}
+    `;
+  });
+}
+
 async function loadAndRender(){
   const statusEl = document.getElementById("chart-status");
   const cardsEl = document.getElementById("cards");
@@ -933,6 +1093,7 @@ async function loadAndRender(){
     statusEl.style.display = "flex";
     statusEl.textContent = "Ajoute une ville pour démarrer la comparaison.";
     cardsEl.innerHTML = "";
+    document.getElementById("bulletin-period").innerHTML = "";
     if(chart){ chart.destroy(); chart = null; }
     document.getElementById("updated-at").textContent = "";
     return;
@@ -1117,6 +1278,7 @@ async function loadAndRender(){
 
     lastResults = results;
     tickClocks();
+    buildPeriodBulletin(results);
 
     // charge (avec cache par coordonnées, une seule fois par ville) les statistiques
     // annuelles de canicule/gel/vent fort/pollution, et remplit les cartes dès réponse
