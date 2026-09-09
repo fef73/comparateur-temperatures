@@ -678,6 +678,11 @@ function renderChips(){
 
 // ---------- Weather fetch + chart ----------
 let viewDay = "today"; // "today" | "tomorrow" | "afterTomorrow" | "threeDays"
+
+// Villes masquées via un clic sur la légende du graphique — le bulletin de la période
+// n'affiche que les villes qui ne sont pas dans cet ensemble. Réinitialisé à chaque
+// nouveau rendu (le graphique étant lui-même reconstruit à chaque fois).
+let hiddenCityIds = new Set();
 const DAY_OFFSETS = { today: 0, tomorrow: 1, afterTomorrow: 2 };
 
 function hourOfISO(iso){
@@ -1124,6 +1129,7 @@ async function loadAndRender(){
       : results[0].hours.map(h => h + "h");
     const datasets = results.map(r => ({
       label: r.city.name,
+      cityId: r.city.id,
       data: r.temps,
       weatherCodes: r.weatherCodes,
       borderColor: r.city.color,
@@ -1184,9 +1190,17 @@ async function loadAndRender(){
             onClick: (evt, legendItem, legend) => {
               const chartInstance = legend.chart;
               const index = legendItem.datasetIndex;
+              const ds = chartInstance.data.datasets[index];
               const meta = chartInstance.getDatasetMeta(index);
               meta.hidden = meta.hidden === null ? !chartInstance.data.datasets[index].hidden : !meta.hidden;
               chartInstance.update();
+
+              // Le bulletin de la période ne doit refléter que les villes actuellement
+              // affichées sur le graphique (celles pas masquées via la légende).
+              if(ds.cityId){
+                if(meta.hidden){ hiddenCityIds.add(ds.cityId); } else { hiddenCityIds.delete(ds.cityId); }
+                buildPeriodBulletin(lastResults.filter(r => !hiddenCityIds.has(r.city.id)));
+              }
             },
           },
           tooltip: {
@@ -1278,6 +1292,7 @@ async function loadAndRender(){
 
     lastResults = results;
     tickClocks();
+    hiddenCityIds = new Set();
     buildPeriodBulletin(results);
 
     // charge (avec cache par coordonnées, une seule fois par ville) les statistiques
