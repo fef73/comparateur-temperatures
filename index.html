@@ -207,6 +207,12 @@
   }
   .card-range b{color:var(--text-hi); font-weight:500;}
 
+  .card-aqi-avg{
+    display:flex; justify-content:space-between; align-items:center; font-family:'IBM Plex Mono', monospace;
+    font-size:11.5px; color:var(--text-lo); margin-top:8px; cursor:help;
+  }
+  .card-aqi-avg b{color:var(--text-hi); font-weight:500;}
+
   .card-yearly{
     display:flex; justify-content:space-between; font-family:'IBM Plex Mono', monospace;
     font-size:11.5px; color:var(--text-lo); margin-top:0; border-top:none; padding-top:6px;
@@ -725,6 +731,55 @@ function getYearlyAqiStats(city){
   return promise;
 }
 
+// Récupère (avec cache par coordonnées) l'historique de qualité de l'air des 7 derniers
+// jours complets (hors aujourd'hui, incomplet), avec le max journalier d'AQI pour chaque jour.
+const recentAqiCache = {};
+function getRecentAqiHistory(city){
+  const key = yearlyStatsKey(city);
+  if(recentAqiCache[key]) return Promise.resolve(recentAqiCache[key]);
+
+  const toISODate = (d) => d.toISOString().slice(0, 10);
+  const today = new Date();
+  const endDate = new Date(today); endDate.setDate(endDate.getDate() - 1); // dernier jour complet
+  const startDate = new Date(endDate); startDate.setDate(startDate.getDate() - 6); // 7 jours au total
+
+  const url = `https://air-quality-api.open-meteo.com/v1/air-quality?latitude=${city.lat}&longitude=${city.lon}` +
+    `&start_date=${toISODate(startDate)}&end_date=${toISODate(endDate)}` +
+    `&hourly=european_aqi&timezone=auto`;
+
+  const promise = fetch(url)
+    .then(res => {
+      if(!res.ok) throw new Error("Erreur API qualité de l'air (7 jours) pour " + city.name);
+      return res.json();
+    })
+    .then(data => {
+      const times = (data.hourly && data.hourly.time) || [];
+      const values = (data.hourly && data.hourly.european_aqi) || [];
+      const dailyMax = {};
+      times.forEach((t, i) => {
+        const day = t.slice(0, 10);
+        const v = values[i];
+        if(v == null) return;
+        if(dailyMax[day] == null || v > dailyMax[day]) dailyMax[day] = v;
+      });
+      const days = Object.keys(dailyMax).sort().map(day => ({
+        date: day,
+        aqiMax: Math.round(dailyMax[day]),
+        exceeded: dailyMax[day] >= AQI_SEUIL_ANNUEL,
+      }));
+      const stats = { days, exceededCount: days.filter(d => d.exceeded).length };
+      recentAqiCache[key] = stats;
+      return stats;
+    })
+    .catch(err => {
+      delete recentAqiCache[key];
+      throw err;
+    });
+
+  recentAqiCache[key] = promise;
+  return promise;
+}
+
 async function fetchCityTemps(city){
   const isMultiDay = viewDay === "threeDays" || viewDay === "sevenDays";
   const numDays = viewDay === "sevenDays" ? 7 : viewDay === "threeDays" ? 3 : 1;
@@ -1031,6 +1086,10 @@ async function loadAndRender(){
             <span>min <b>${min}°</b></span>
             <span>max <b>${max}°</b></span>
           </div>
+          <div class="card-aqi-avg" title="Moyenne des indices de qualité de l'air (AQI) maximaux quotidiens, sur les 7 derniers jours complets.">
+            <span>🌫️ AQI moyen (7j)</span>
+            <b id="aqi-avg-${r.city.id}">…</b>
+          </div>
           <div class="card-yearly-header">
             <span>Extrêmes sur 365 jours</span>
             <i class="cy-info" title="Nombre de jours, sur les 365 derniers jours, où : la température maximale a atteint ${CANICULE_SEUIL_ANNUEL}°C ou plus (canicule) ; la température minimale est descendue à ${GEL_SEUIL_ANNUEL}°C ou moins (gel) ; la rafale de vent maximale a atteint ${VENT_SEUIL_ANNUEL} km/h ou plus (vent fort) ; l'indice de qualité de l'air européen a atteint ${AQI_SEUIL_ANNUEL} ou plus (pollution). Données historiques Open-Meteo, mesurées à l'emplacement exact de cette ville.">i</i>
@@ -1084,6 +1143,21 @@ async function loadAndRender(){
       }).catch(() => {
         const aqiEl = document.getElementById("yearly-aqi-" + r.city.id);
         if(aqiEl) aqiEl.textContent = "--";
+      });
+
+      getRecentAqiHistory(r.city).then(stats => {
+        const avgEl = document.getElementById("aqi-avg-" + r.city.id);
+        if(avgEl){
+          if(stats.days.length){
+            const avg = stats.days.reduce((sum, d) => sum + d.aqiMax, 0) / stats.days.length;
+            avgEl.textContent = Math.round(avg);
+          } else {
+            avgEl.textContent = "--";
+          }
+        }
+      }).catch(() => {
+        const avgEl = document.getElementById("aqi-avg-" + r.city.id);
+        if(avgEl) avgEl.textContent = "--";
       });
     });
 
