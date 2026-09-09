@@ -474,7 +474,7 @@
   <footer>
     <span id="footer-source-line">Source : Open-Meteo.com (géocodage + prévisions horaires, sans clé API) · Fuseau horaire local à chaque ville<br>
     Le lien partagé conserve ta sélection de villes</span>
-    <div style="margin-top:8px; opacity:.5;">build : 2026-09-09-i18n-fr-en</div>
+    <div style="margin-top:8px; opacity:.5;" id="generation-timestamp">généré le 09/09/2026 à 13:43</div>
     <div class="tip" id="footer-tip1">
       💡 Astuce — comparer plusieurs altitudes de la même ville : ajoute-la, saisis une altitude puis clique <b>Valider</b> ;
       le panneau reste ouvert, saisis une autre altitude et clique à nouveau <b>Valider</b> — répète autant de fois que voulu,
@@ -578,6 +578,7 @@ const TRANSLATIONS = {
     footerTip2Intro: "💡 Accès direct par API (ex : raccourci, appli mobile) — passe des coordonnées GPS dans l'URL au lieu de chercher une ville :",
     footerTip2Optional: "et nom sont optionnels",
     footerTip2Multi: "Plusieurs points d'un coup, séparés par ;, chacun au format lat,lon,alt,nom :",
+    generatedOn: (d) => `généré le ${d}`,
   },
   en: {
     eyebrow: "live data — open-meteo",
@@ -649,10 +650,14 @@ const TRANSLATIONS = {
     footerTip2Intro: "💡 Direct API access (e.g. shortcut, mobile app) — pass GPS coordinates in the URL instead of searching for a city:",
     footerTip2Optional: "and nom are optional",
     footerTip2Multi: "Several points at once, separated by ;, each in lat,lon,alt,nom format:",
+    generatedOn: (d) => `generated on ${d}`,
   },
 };
 
 let lang = localStorage.getItem("comparateur-lang") || (navigator.language && navigator.language.startsWith("en") ? "en" : "fr");
+
+// Horodatage de la génération de ce fichier — mis à jour manuellement à chaque nouvelle version.
+const GENERATION_TIMESTAMP = "09/09/2026 13:43";
 
 function t(key, ...args){
   const dict = TRANSLATIONS[lang] || TRANSLATIONS.fr;
@@ -714,6 +719,8 @@ function applyStaticTranslations(){
     if(tip2Optional) tip2Optional.textContent = t("footerTip2Optional");
     const tip2Multi = document.getElementById("footer-tip2-multi");
     if(tip2Multi) tip2Multi.textContent = t("footerTip2Multi");
+    const genTs = document.getElementById("generation-timestamp");
+    if(genTs) genTs.textContent = t("generatedOn", GENERATION_TIMESTAMP);
   }
   const chartStatus = document.getElementById("chart-status");
   if(chartStatus && !cities.length) chartStatus.textContent = t("chartStatusEmpty");
