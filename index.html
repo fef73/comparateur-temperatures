@@ -42,6 +42,21 @@
     font-size:12px; letter-spacing:.14em; text-transform:uppercase;
     color:var(--live); display:flex; align-items:center; gap:8px; margin-bottom:8px;
   }
+  .header-top-row{
+    display:flex; justify-content:space-between; align-items:center; gap:12px; flex-wrap:wrap;
+  }
+  .header-top-row .eyebrow{margin-bottom:0;}
+  .lang-switch{
+    display:flex; gap:4px; background:var(--bg-input); border:1px solid var(--hairline);
+    border-radius:8px; padding:3px;
+  }
+  .lang-btn{
+    font-family:'IBM Plex Mono', monospace; font-size:11px; font-weight:600; letter-spacing:.04em;
+    color:var(--text-lo); background:transparent; border:none; border-radius:6px;
+    padding:5px 10px; cursor:pointer; transition:background .15s, color .15s;
+  }
+  .lang-btn:hover{color:var(--text-hi);}
+  .lang-btn.active{background:var(--live); color:#0b1622;}
   .pulse{width:7px;height:7px;border-radius:50%;background:var(--live);
     box-shadow:0 0 0 0 rgba(126,228,184,.6); animation:pulse 2.2s infinite;}
   @keyframes pulse{
@@ -370,7 +385,13 @@
 <div class="wrap">
 
   <header>
-    <div class="eyebrow"><span class="pulse"></span> données en direct — open-meteo</div>
+    <div class="header-top-row">
+      <div class="eyebrow"><span class="pulse"></span> données en direct — open-meteo</div>
+      <div class="lang-switch">
+        <button class="lang-btn" data-lang="fr">FR</button>
+        <button class="lang-btn" data-lang="en">EN</button>
+      </div>
+    </div>
     <h1>Prévisions Météo Multisites</h1>
     <div class="subtitle" id="subtitle">Sélectionne n'importe quelle ville dans le monde et compare les températures du jour, en direct. Tu as aussi l'heure locale.</div>
     <div class="day-toggle" id="day-toggle">
@@ -451,18 +472,18 @@
   </div>
 
   <footer>
-    Source : Open-Meteo.com (géocodage + prévisions horaires, sans clé API) · Fuseau horaire local à chaque ville<br>
-    Le lien partagé conserve ta sélection de villes
+    <span id="footer-source-line">Source : Open-Meteo.com (géocodage + prévisions horaires, sans clé API) · Fuseau horaire local à chaque ville<br>
+    Le lien partagé conserve ta sélection de villes</span>
     <div style="margin-top:8px; opacity:.5;">build : 2026-08-17-tooltip-icons</div>
-    <div class="tip">
+    <div class="tip" id="footer-tip1">
       💡 Astuce — comparer plusieurs altitudes de la même ville : ajoute-la, saisis une altitude puis clique <b>Valider</b> ;
       le panneau reste ouvert, saisis une autre altitude et clique à nouveau <b>Valider</b> — répète autant de fois que voulu,
       puis ferme le panneau avec le <b>×</b>.
     </div>
     <div class="tip">
-      💡 Accès direct par API (ex : raccourci, appli mobile) — passe des coordonnées GPS dans l'URL au lieu de chercher une ville :<br>
-      <code>?lat=45.9237&amp;lon=6.8694&amp;alt=1035&amp;nom=Chamonix</code> (<code>alt</code> et <code>nom</code> sont optionnels)<br>
-      Plusieurs points d'un coup, séparés par <code>;</code>, chacun au format <code>lat,lon,alt,nom</code> :<br>
+      <span id="footer-tip2-intro">💡 Accès direct par API (ex : raccourci, appli mobile) — passe des coordonnées GPS dans l'URL au lieu de chercher une ville :</span><br>
+      <code>?lat=45.9237&amp;lon=6.8694&amp;alt=1035&amp;nom=Chamonix</code> (<code>alt</code> <span id="footer-tip2-optional">et nom sont optionnels</span>)<br>
+      <span id="footer-tip2-multi">Plusieurs points d'un coup, séparés par ;, chacun au format lat,lon,alt,nom :</span><br>
       <code>?points=45.9237,6.8694,1035,Chamonix;48.8566,2.3522,,Paris</code>
     </div>
   </footer>
@@ -484,6 +505,226 @@ let cities = [];       // {id, name, admin1, country, lat, lon, color}
 let colorCounter = 0;
 let chart;
 let debounceTimer;
+
+// ---------- i18n ----------
+const TRANSLATIONS = {
+  fr: {
+    eyebrow: "données en direct — open-meteo",
+    title: "Prévisions Météo Multisites",
+    subtitleToday: "Sélectionne n'importe quelle ville dans le monde et compare les températures du jour, en direct. Tu as aussi l'heure locale.",
+    subtitleTomorrow: "Prévisions horaires de demain pour les villes sélectionnées. Tu as aussi l'heure locale.",
+    subtitleAfterTomorrow: "Prévisions horaires d'après-demain pour les villes sélectionnées. Tu as aussi l'heure locale.",
+    subtitleThreeDays: "Prévisions horaires sur 3 jours d'affilée, sur un seul graphique. Tu as aussi l'heure locale.",
+    subtitleSevenDays: "Prévisions horaires sur 7 jours d'affilée, sur un seul graphique. Au-delà de 2-3 jours, la précision d'Open-Meteo diminue — à prendre comme une tendance plutôt qu'une prévision fine.",
+    dayToday: "Aujourd'hui", dayTomorrow: "Demain", dayAfterTomorrow: "Après-demain",
+    dayThreeDays: "3 jours", daySevenDays: "7 jours",
+    searchPlaceholder: "Ajouter une ville (ex : Lyon, Tokyo, New York…)",
+    searchLoading: "recherche…",
+    searchError: "Erreur de recherche. Réessaie.",
+    searchNoResults: "Aucun résultat.",
+    altitudePromptPrefix: "Altitude précise pour",
+    altitudePromptSub: "(optionnel — corrige la température pour un point en altitude, ex : station de ski)",
+    altitudeClose: "Fermer",
+    altitudePlaceholder: "Altitude en mètres",
+    altitudeSkip: "Ajouter sans préciser",
+    altitudeConfirm: "Valider",
+    chipEmpty: "Aucune ville sélectionnée pour l'instant — cherche-en une ci-dessus.",
+    chipRemove: "Retirer",
+    shareNative: "📤 Partager",
+    shareCopy: "🔗 Copier le lien",
+    shareCopied: "✓ Lien copié",
+    refresh: "↻ Actualiser",
+    chartStatusEmpty: "Ajoute une ville pour démarrer la comparaison.",
+    chartStatusLoading: "Récupération des données Open-Meteo…",
+    chartStatusError: "Impossible de charger les données (",
+    chartHint: "💡 Clique sur une ville dans la légende ci-dessus pour afficher ou masquer sa courbe.",
+    cardHumidity: "humidité", cardWind: "vent", cardSun: "soleil au plus haut",
+    cardMin: "min", cardMax: "max",
+    aqiAvgLabel: "🌫️ AQI moyen (7j)",
+    aqiAvgTitle: "Moyenne des indices de qualité de l'air (AQI) maximaux quotidiens, sur les 7 derniers jours complets.",
+    yearlyHeader: "Extrêmes sur 365 jours",
+    yearlyInfoTooltip: (c, g, v, a) => `Nombre de jours, sur les 365 derniers jours, où : la température maximale a atteint ${c}°C ou plus (canicule) ; la température minimale est descendue à ${g}°C ou moins (gel) ; la rafale de vent maximale a atteint ${v} km/h ou plus (vent fort) ; l'indice de qualité de l'air européen a atteint ${a} ou plus (pollution). Données historiques Open-Meteo, mesurées à l'emplacement exact de cette ville.`,
+    yearlyCaniculeLabel: (c) => `🔥 canicule (≥${c}°C)`,
+    yearlyCaniculeTitle: (c) => `Jours où la température maximale a atteint ${c}°C ou plus, sur les 365 derniers jours.`,
+    yearlyGelLabel: (g) => `❄️ gel (≤${g}°C)`,
+    yearlyGelTitle: (g) => `Jours où la température minimale est descendue à ${g}°C ou moins, sur les 365 derniers jours.`,
+    yearlyVentLabel: (v) => `💨 vent rafales ≥${v} km/h`,
+    yearlyVentTitle: (v) => `Jours où la rafale de vent maximale a atteint ${v} km/h ou plus, sur les 365 derniers jours.`,
+    yearlyPollutionLabel: (a) => `🌫️ pollution (AQI ≥${a})`,
+    yearlyPollutionTitle: (a) => `Jours où l'indice de qualité de l'air européen (AQI) a atteint ${a} ou plus (mauvaise qualité d'air et au-delà), sur les 365 derniers jours.`,
+    yearlyNote: "Sur les 365 derniers jours, à cet endroit précis (archives Open-Meteo)",
+    thresholdCanicule: (c) => `Seuil canicule (${c}°C)`,
+    thresholdGel: (g) => `Seuil de gel (${g}°C)`,
+    periodToday: "aujourd'hui", periodTomorrow: "demain", periodAfterTomorrow: "après-demain",
+    periodThreeDays: "sur les 3 prochains jours", periodSevenDays: "sur les 7 prochains jours",
+    bulletinHeader: (label) => `📅 bulletin — ${label}`,
+    bulletinLead: (city, temp, label) => `${city} tient la tête ${label} avec ${temp}°C`,
+    bulletinColdSuffix: (city, temp) => `, tandis que ${city} est la plus fraîche avec ${temp}°C`,
+    bulletinCaniculeAlert: (city, max, label, threshold) => `${city} : pic à ${max}°C ${label}, seuil canicule (${threshold}°C) dépassé.`,
+    bulletinGelAlert: (city, min, label) => `${city} : minimale de ${min}°C ${label}, risque de gel.`,
+    aqiHistoryHeader: (a) => `🌫️ historique pollution — 7 derniers jours (AQI ≥ ${a})`,
+    aqiHistoryCount: (n, a) => ` · ${n}/7 j ≥${a}`,
+    hotspotCalculating: "Calcul du point le plus chaud du monde…",
+    hotspotResult: (name, country, temp) => `Aujourd'hui, l'endroit le plus chaud parmi ces zones extrêmes est <b>${name}, ${country}</b> — <b>${temp}°C</b> prévus`,
+    hotspotError: "Impossible de calculer le point le plus chaud du monde pour le moment.",
+    hotspotNote: "Estimé à partir d'une sélection de zones connues pour la chaleur extrême (déserts et régions records) — pas une recherche exhaustive de toutes les villes du monde.",
+    coldspotCalculating: "Calcul du point le plus froid du monde…",
+    coldspotResult: (name, country, temp) => `Aujourd'hui, l'endroit le plus froid parmi ces zones extrêmes est <b>${name}, ${country}</b> — <b>${temp}°C</b> prévus`,
+    coldspotError: "Impossible de calculer le point le plus froid du monde pour le moment.",
+    coldspotNote: "Estimé à partir d'une sélection de zones connues pour le froid extrême (Sibérie, Arctique, Antarctique, stations polaires) — pas une recherche exhaustive de toutes les villes du monde.",
+    footerSource: "Source : Open-Meteo.com (géocodage + prévisions horaires, sans clé API) · Fuseau horaire local à chaque ville",
+    footerShareNote: "Le lien partagé conserve ta sélection de villes",
+    footerTip1: "💡 Astuce — comparer plusieurs altitudes de la même ville : ajoute-la, saisis une altitude puis clique <b>Valider</b> ; le panneau reste ouvert, saisis une autre altitude et clique à nouveau <b>Valider</b> — répète autant de fois que voulu, puis ferme le panneau avec le <b>×</b>.",
+    footerTip2Intro: "💡 Accès direct par API (ex : raccourci, appli mobile) — passe des coordonnées GPS dans l'URL au lieu de chercher une ville :",
+    footerTip2Optional: "et nom sont optionnels",
+    footerTip2Multi: "Plusieurs points d'un coup, séparés par ;, chacun au format lat,lon,alt,nom :",
+  },
+  en: {
+    eyebrow: "live data — open-meteo",
+    title: "Multi-City Weather Forecast",
+    subtitleToday: "Pick any city in the world and compare today's temperatures, live. Local time included.",
+    subtitleTomorrow: "Hourly forecast for tomorrow for the selected cities. Local time included.",
+    subtitleAfterTomorrow: "Hourly forecast for the day after tomorrow for the selected cities. Local time included.",
+    subtitleThreeDays: "Hourly forecast over 3 straight days, on a single chart. Local time included.",
+    subtitleSevenDays: "Hourly forecast over 7 straight days, on a single chart. Beyond 2-3 days, Open-Meteo's accuracy drops — treat it as a trend rather than a precise forecast.",
+    dayToday: "Today", dayTomorrow: "Tomorrow", dayAfterTomorrow: "Day after tomorrow",
+    dayThreeDays: "3 days", daySevenDays: "7 days",
+    searchPlaceholder: "Add a city (e.g. Lyon, Tokyo, New York…)",
+    searchLoading: "searching…",
+    searchError: "Search error. Try again.",
+    searchNoResults: "No results.",
+    altitudePromptPrefix: "Precise altitude for",
+    altitudePromptSub: "(optional — corrects the temperature for a point at altitude, e.g. a ski resort)",
+    altitudeClose: "Close",
+    altitudePlaceholder: "Altitude in meters",
+    altitudeSkip: "Add without specifying",
+    altitudeConfirm: "Confirm",
+    chipEmpty: "No city selected yet — search for one above.",
+    chipRemove: "Remove",
+    shareNative: "📤 Share",
+    shareCopy: "🔗 Copy link",
+    shareCopied: "✓ Link copied",
+    refresh: "↻ Refresh",
+    chartStatusEmpty: "Add a city to start comparing.",
+    chartStatusLoading: "Fetching data from Open-Meteo…",
+    chartStatusError: "Unable to load data (",
+    chartHint: "💡 Click a city in the legend above to show or hide its line.",
+    cardHumidity: "humidity", cardWind: "wind", cardSun: "sun at its highest",
+    cardMin: "min", cardMax: "max",
+    aqiAvgLabel: "🌫️ Avg AQI (7d)",
+    aqiAvgTitle: "Average of the daily maximum air quality index (AQI), over the last 7 complete days.",
+    yearlyHeader: "Extremes over 365 days",
+    yearlyInfoTooltip: (c, g, v, a) => `Number of days, over the last 365 days, where: the maximum temperature reached ${c}°C or more (heatwave); the minimum temperature dropped to ${g}°C or less (frost); the maximum wind gust reached ${v} km/h or more (strong wind); the European air quality index reached ${a} or more (pollution). Historical Open-Meteo data, measured at this city's exact location.`,
+    yearlyCaniculeLabel: (c) => `🔥 heatwave (≥${c}°C)`,
+    yearlyCaniculeTitle: (c) => `Days where the maximum temperature reached ${c}°C or more, over the last 365 days.`,
+    yearlyGelLabel: (g) => `❄️ frost (≤${g}°C)`,
+    yearlyGelTitle: (g) => `Days where the minimum temperature dropped to ${g}°C or less, over the last 365 days.`,
+    yearlyVentLabel: (v) => `💨 wind gusts ≥${v} km/h`,
+    yearlyVentTitle: (v) => `Days where the maximum wind gust reached ${v} km/h or more, over the last 365 days.`,
+    yearlyPollutionLabel: (a) => `🌫️ pollution (AQI ≥${a})`,
+    yearlyPollutionTitle: (a) => `Days where the European air quality index (AQI) reached ${a} or more (poor air quality and beyond), over the last 365 days.`,
+    yearlyNote: "Over the last 365 days, at this exact location (Open-Meteo archives)",
+    thresholdCanicule: (c) => `Heatwave threshold (${c}°C)`,
+    thresholdGel: (g) => `Frost threshold (${g}°C)`,
+    periodToday: "today", periodTomorrow: "tomorrow", periodAfterTomorrow: "the day after tomorrow",
+    periodThreeDays: "over the next 3 days", periodSevenDays: "over the next 7 days",
+    bulletinHeader: (label) => `📅 bulletin — ${label}`,
+    bulletinLead: (city, temp, label) => `${city} is in the lead ${label} with ${temp}°C`,
+    bulletinColdSuffix: (city, temp) => `, while ${city} is the coolest at ${temp}°C`,
+    bulletinCaniculeAlert: (city, max, label, threshold) => `${city}: peaked at ${max}°C ${label}, past the heatwave threshold (${threshold}°C).`,
+    bulletinGelAlert: (city, min, label) => `${city}: low of ${min}°C ${label}, frost risk.`,
+    aqiHistoryHeader: (a) => `🌫️ pollution history — last 7 days (AQI ≥ ${a})`,
+    aqiHistoryCount: (n, a) => ` · ${n}/7 d ≥${a}`,
+    hotspotCalculating: "Calculating the world's hottest spot…",
+    hotspotResult: (name, country, temp) => `Today, the hottest spot among these extreme zones is <b>${name}, ${country}</b> — <b>${temp}°C</b> expected`,
+    hotspotError: "Unable to calculate the world's hottest spot right now.",
+    hotspotNote: "Estimated from a curated selection of locations known for extreme heat (deserts and record-holding regions) — not an exhaustive search of every city in the world.",
+    coldspotCalculating: "Calculating the world's coldest spot…",
+    coldspotResult: (name, country, temp) => `Today, the coldest spot among these extreme zones is <b>${name}, ${country}</b> — <b>${temp}°C</b> expected`,
+    coldspotError: "Unable to calculate the world's coldest spot right now.",
+    coldspotNote: "Estimated from a curated selection of locations known for extreme cold (Siberia, Arctic, Antarctic, polar stations) — not an exhaustive search of every city in the world.",
+    footerSource: "Source: Open-Meteo.com (geocoding + hourly forecasts, no API key) · Local time zone for each city",
+    footerShareNote: "The shared link keeps your city selection",
+    footerTip1: "💡 Tip — comparing several altitudes of the same city: add it, enter an altitude then click <b>Confirm</b>; the panel stays open, enter another altitude and click <b>Confirm</b> again — repeat as many times as you like, then close the panel with <b>×</b>.",
+    footerTip2Intro: "💡 Direct API access (e.g. shortcut, mobile app) — pass GPS coordinates in the URL instead of searching for a city:",
+    footerTip2Optional: "and nom are optional",
+    footerTip2Multi: "Several points at once, separated by ;, each in lat,lon,alt,nom format:",
+  },
+};
+
+let lang = localStorage.getItem("comparateur-lang") || (navigator.language && navigator.language.startsWith("en") ? "en" : "fr");
+
+function t(key, ...args){
+  const dict = TRANSLATIONS[lang] || TRANSLATIONS.fr;
+  const entry = dict[key] !== undefined ? dict[key] : TRANSLATIONS.fr[key];
+  return typeof entry === "function" ? entry(...args) : entry;
+}
+
+function setLang(newLang){
+  if(newLang !== "fr" && newLang !== "en") return;
+  if(newLang === lang) return;
+  lang = newLang;
+  localStorage.setItem("comparateur-lang", lang);
+  document.documentElement.lang = lang;
+  document.querySelectorAll(".lang-btn").forEach(b => b.classList.toggle("active", b.dataset.lang === lang));
+  applyStaticTranslations();
+  renderChips();
+  refreshHotspotTexts();
+  // Recharge et reconstruit tout (graphique, cartes, bulletin) dans la nouvelle langue —
+  // plus simple et plus sûr qu'une reconstruction partielle à partir du cache.
+  loadAndRender();
+}
+
+function applyStaticTranslations(){
+  document.querySelector(".eyebrow").innerHTML = `<span class="pulse"></span> ${t("eyebrow")}`;
+  document.querySelector("h1").textContent = t("title");
+  document.querySelectorAll(".day-toggle-btn").forEach(btn => {
+    const map = { today: "dayToday", tomorrow: "dayTomorrow", afterTomorrow: "dayAfterTomorrow", threeDays: "dayThreeDays", sevenDays: "daySevenDays" };
+    btn.textContent = t(map[btn.dataset.day]);
+  });
+  updateSubtitle();
+  searchInput.placeholder = t("searchPlaceholder");
+  document.getElementById("search-loading").textContent = t("searchLoading");
+  document.getElementById("altitude-close-btn").setAttribute("aria-label", t("altitudeClose"));
+  document.getElementById("altitude-input").placeholder = t("altitudePlaceholder");
+  document.getElementById("altitude-skip-btn").textContent = t("altitudeSkip");
+  document.getElementById("altitude-confirm-btn").textContent = t("altitudeConfirm");
+  const altSub = document.querySelector(".altitude-prompt-sub");
+  if(altSub) altSub.textContent = t("altitudePromptSub");
+  document.getElementById("native-share-btn").textContent = t("shareNative");
+  document.getElementById("share-btn").textContent = t("shareCopy");
+  document.getElementById("refresh-btn").textContent = t("refresh");
+  const hint = document.querySelector(".chart-hint");
+  if(hint) hint.textContent = t("chartHint");
+  const hotspotNote = document.querySelector("#hotspot-banner .hotspot-note");
+  if(hotspotNote) hotspotNote.textContent = t("hotspotNote");
+  const coldspotNote = document.querySelector("#coldspot-banner .hotspot-note");
+  if(coldspotNote) coldspotNote.textContent = t("coldspotNote");
+  const footer = document.querySelector("footer");
+  if(footer){
+    const sourceLine = document.getElementById("footer-source-line");
+    if(sourceLine) sourceLine.innerHTML = `${t("footerSource")}<br>${t("footerShareNote")}`;
+    const tip1 = document.getElementById("footer-tip1");
+    if(tip1) tip1.innerHTML = "💡 " + t("footerTip1").replace(/^💡\s*/, "");
+    const tip2Intro = document.getElementById("footer-tip2-intro");
+    if(tip2Intro) tip2Intro.textContent = t("footerTip2Intro");
+    const tip2Optional = document.getElementById("footer-tip2-optional");
+    if(tip2Optional) tip2Optional.textContent = t("footerTip2Optional");
+    const tip2Multi = document.getElementById("footer-tip2-multi");
+    if(tip2Multi) tip2Multi.textContent = t("footerTip2Multi");
+  }
+  const chartStatus = document.getElementById("chart-status");
+  if(chartStatus && !cities.length) chartStatus.textContent = t("chartStatusEmpty");
+}
+
+function updateSubtitle(){
+  const subtitleEl = document.getElementById("subtitle");
+  const map = {
+    today: "subtitleToday", tomorrow: "subtitleTomorrow", afterTomorrow: "subtitleAfterTomorrow",
+    threeDays: "subtitleThreeDays", sevenDays: "subtitleSevenDays",
+  };
+  subtitleEl.textContent = t(map[viewDay] || "subtitleToday");
+}
 
 function nextColor(){
   const c = PALETTE[colorCounter % PALETTE.length];
@@ -542,21 +783,21 @@ document.addEventListener("click", (e) => {
 
 async function runSearch(q){
   try{
-    const url = `https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(q)}&count=8&language=fr&format=json`;
+    const url = `https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(q)}&count=8&language=${lang}&format=json`;
     const res = await fetch(url);
     const data = await res.json();
     loadingEl.style.display = "none";
     renderResults(data.results || []);
   }catch(err){
     loadingEl.style.display = "none";
-    resultsEl.innerHTML = `<div class="result-empty">Erreur de recherche. Réessaie.</div>`;
+    resultsEl.innerHTML = `<div class="result-empty">${t("searchError")}</div>`;
     resultsEl.style.display = "block";
   }
 }
 
 function renderResults(list){
   if(!list.length){
-    resultsEl.innerHTML = `<div class="result-empty">Aucun résultat.</div>`;
+    resultsEl.innerHTML = `<div class="result-empty">${t("searchNoResults")}</div>`;
     resultsEl.style.display = "block";
     return;
   }
@@ -661,14 +902,14 @@ function removeCity(id){
 function renderChips(){
   const chipsEl = document.getElementById("chips");
   if(!cities.length){
-    chipsEl.innerHTML = `<div class="chip-empty">Aucune ville sélectionnée pour l'instant — cherche-en une ci-dessus.</div>`;
+    chipsEl.innerHTML = `<div class="chip-empty">${t("chipEmpty")}</div>`;
     return;
   }
   chipsEl.innerHTML = cities.map(c => `
     <div class="chip">
       <span class="dot" style="background:${c.color}"></span>
       ${c.name}${c.country ? " · " + c.country : ""}${c.elevation != null ? " · " + c.elevation + " m" : ""}
-      <button data-id="${c.id}" aria-label="Retirer">×</button>
+      <button data-id="${c.id}" aria-label="${t("chipRemove")}">×</button>
     </div>
   `).join("");
   chipsEl.querySelectorAll("button").forEach(btn => {
@@ -1096,7 +1337,7 @@ async function loadAndRender(){
 
   if(!cities.length){
     statusEl.style.display = "flex";
-    statusEl.textContent = "Ajoute une ville pour démarrer la comparaison.";
+    statusEl.textContent = t("chartStatusEmpty");
     cardsEl.innerHTML = "";
     document.getElementById("bulletin-period").innerHTML = "";
     if(chart){ chart.destroy(); chart = null; }
@@ -1105,7 +1346,7 @@ async function loadAndRender(){
   }
 
   statusEl.style.display = "flex";
-  statusEl.textContent = "Récupération des données Open-Meteo…";
+  statusEl.textContent = t("chartStatusLoading");
 
   try{
     const results = await Promise.all(cities.map(async city => {
@@ -1115,8 +1356,10 @@ async function loadAndRender(){
 
     statusEl.style.display = "none";
 
-    const WEEKDAYS_SHORT = ["dim","lun","mar","mer","jeu","ven","sam"];
-    const dayShortLabels = ["Auj.", "Dem.", "Aprèsdem."];
+    const WEEKDAYS_SHORT = lang === "en"
+      ? ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"]
+      : ["dim","lun","mar","mer","jeu","ven","sam"];
+    const dayShortLabels = lang === "en" ? ["Tod.", "Tom.", "Aftertom."] : ["Auj.", "Dem.", "Aprèsdem."];
     const labels = viewDay === "sevenDays"
       ? results[0].timestamps.map(t => {
           const [datePart, timePart] = t.split("T");
@@ -1142,7 +1385,7 @@ async function loadAndRender(){
     }));
 
     datasets.push({
-      label: "Seuil canicule (35°C)",
+      label: t("thresholdCanicule", 35),
       data: labels.map(() => 35),
       borderColor: "#ff3b3b",
       backgroundColor: "#ff3b3b",
@@ -1156,7 +1399,7 @@ async function loadAndRender(){
     });
 
     datasets.push({
-      label: "Seuil de gel (0°C)",
+      label: t("thresholdGel", 0),
       data: labels.map(() => 0),
       borderColor: "#48cae4",
       backgroundColor: "#48cae4",
@@ -1209,7 +1452,7 @@ async function loadAndRender(){
             borderWidth: 1,
             titleFont: { family: "IBM Plex Mono" },
             bodyFont: { family: "IBM Plex Mono" },
-            filter: (item) => item.dataset.label !== "Seuil canicule (35°C)" && item.dataset.label !== "Seuil de gel (0°C)",
+            filter: (item) => item.dataset.label !== t("thresholdCanicule", 35) && item.dataset.label !== t("thresholdGel", 0),
             callbacks: {
               label: (item) => {
                 const codes = item.dataset.weatherCodes;
@@ -1252,40 +1495,45 @@ async function loadAndRender(){
           </div>
           <div class="card-temp-row">
             <span class="card-icon" id="icon-${r.city.id}">${icon}</span>
-            <div class="card-temp"><span id="temp-${r.city.id}">${currentTemp.toFixed(1)}</span><span class="unit">${viewDay === "today" ? "°C actuellement" : viewDay === "tomorrow" ? "°C demain à midi" : viewDay === "afterTomorrow" ? "°C après-demain à midi" : "°C actuellement"}</span></div>
+            <div class="card-temp"><span id="temp-${r.city.id}">${currentTemp.toFixed(1)}</span><span class="unit">${
+              viewDay === "today" ? (lang === "en" ? "°C now" : "°C actuellement")
+              : viewDay === "tomorrow" ? (lang === "en" ? "°C tomorrow at noon" : "°C demain à midi")
+              : viewDay === "afterTomorrow" ? (lang === "en" ? "°C day after tomorrow at noon" : "°C après-demain à midi")
+              : (lang === "en" ? "°C now" : "°C actuellement")
+            }</span></div>
           </div>
-          <div class="card-humidity">💧 humidité <b id="hum-${r.city.id}">${humidity != null ? humidity + "%" : "--"}</b></div>
-          <div class="card-wind">💨 vent <b id="wind-${r.city.id}">${wind.speed != null ? wind.speed + " km/h" + (wind.direction ? " " + wind.direction : "") : "--"}</b></div>
-          <div class="card-sun">☀️ soleil au plus haut <b>${r.solarNoon || "--"}</b></div>
+          <div class="card-humidity">💧 ${t("cardHumidity")} <b id="hum-${r.city.id}">${humidity != null ? humidity + "%" : "--"}</b></div>
+          <div class="card-wind">💨 ${t("cardWind")} <b id="wind-${r.city.id}">${wind.speed != null ? wind.speed + " km/h" + (wind.direction ? " " + wind.direction : "") : "--"}</b></div>
+          <div class="card-sun">☀️ ${t("cardSun")} <b>${r.solarNoon || "--"}</b></div>
           <div class="card-range">
-            <span>min <b>${min}°</b></span>
-            <span>max <b>${max}°</b></span>
+            <span>${t("cardMin")} <b>${min}°</b></span>
+            <span>${t("cardMax")} <b>${max}°</b></span>
           </div>
-          <div class="card-aqi-avg" title="Moyenne des indices de qualité de l'air (AQI) maximaux quotidiens, sur les 7 derniers jours complets.">
-            <span>🌫️ AQI moyen (7j)</span>
+          <div class="card-aqi-avg" title="${t("aqiAvgTitle")}">
+            <span>${t("aqiAvgLabel")}</span>
             <b id="aqi-avg-${r.city.id}">…</b>
           </div>
           <div class="card-yearly-header">
-            <span>Extrêmes sur 365 jours</span>
-            <i class="cy-info" title="Nombre de jours, sur les 365 derniers jours, où : la température maximale a atteint ${CANICULE_SEUIL_ANNUEL}°C ou plus (canicule) ; la température minimale est descendue à ${GEL_SEUIL_ANNUEL}°C ou moins (gel) ; la rafale de vent maximale a atteint ${VENT_SEUIL_ANNUEL} km/h ou plus (vent fort) ; l'indice de qualité de l'air européen a atteint ${AQI_SEUIL_ANNUEL} ou plus (pollution). Données historiques Open-Meteo, mesurées à l'emplacement exact de cette ville.">i</i>
+            <span>${t("yearlyHeader")}</span>
+            <i class="cy-info" title="${t("yearlyInfoTooltip", CANICULE_SEUIL_ANNUEL, GEL_SEUIL_ANNUEL, VENT_SEUIL_ANNUEL, AQI_SEUIL_ANNUEL)}">i</i>
           </div>
-          <div class="card-yearly" title="Jours où la température maximale a atteint ${CANICULE_SEUIL_ANNUEL}°C ou plus, sur les 365 derniers jours.">
-            <span class="cy-label">🔥 canicule (≥${CANICULE_SEUIL_ANNUEL}°C)</span>
+          <div class="card-yearly" title="${t("yearlyCaniculeTitle", CANICULE_SEUIL_ANNUEL)}">
+            <span class="cy-label">${t("yearlyCaniculeLabel", CANICULE_SEUIL_ANNUEL)}</span>
             <b id="yearly-canicule-${r.city.id}">…</b>
           </div>
-          <div class="card-yearly" title="Jours où la température minimale est descendue à ${GEL_SEUIL_ANNUEL}°C ou moins, sur les 365 derniers jours.">
-            <span class="cy-label">❄️ gel (≤${GEL_SEUIL_ANNUEL}°C)</span>
+          <div class="card-yearly" title="${t("yearlyGelTitle", GEL_SEUIL_ANNUEL)}">
+            <span class="cy-label">${t("yearlyGelLabel", GEL_SEUIL_ANNUEL)}</span>
             <b id="yearly-gel-${r.city.id}">…</b>
           </div>
-          <div class="card-yearly" title="Jours où la rafale de vent maximale a atteint ${VENT_SEUIL_ANNUEL} km/h ou plus, sur les 365 derniers jours.">
-            <span class="cy-label">💨 vent rafales ≥${VENT_SEUIL_ANNUEL} km/h</span>
+          <div class="card-yearly" title="${t("yearlyVentTitle", VENT_SEUIL_ANNUEL)}">
+            <span class="cy-label">${t("yearlyVentLabel", VENT_SEUIL_ANNUEL)}</span>
             <b id="yearly-vent-${r.city.id}">…</b>
           </div>
-          <div class="card-yearly" title="Jours où l'indice de qualité de l'air européen (AQI) a atteint ${AQI_SEUIL_ANNUEL} ou plus (mauvaise qualité d'air et au-delà), sur les 365 derniers jours.">
-            <span class="cy-label">🌫️ pollution (AQI ≥${AQI_SEUIL_ANNUEL})</span>
+          <div class="card-yearly" title="${t("yearlyPollutionTitle", AQI_SEUIL_ANNUEL)}">
+            <span class="cy-label">${t("yearlyPollutionLabel", AQI_SEUIL_ANNUEL)}</span>
             <b id="yearly-aqi-${r.city.id}">…</b>
           </div>
-          <div class="card-yearly-note">Sur les 365 derniers jours, à cet endroit précis (archives Open-Meteo)</div>
+          <div class="card-yearly-note">${t("yearlyNote")}</div>
         </div>
       `;
     }).join("");
@@ -1344,7 +1592,7 @@ async function loadAndRender(){
 
   } catch(err){
     statusEl.style.display = "flex";
-    statusEl.textContent = "Impossible de charger les données (" + err.message + ")";
+    statusEl.textContent = t("chartStatusError") + err.message + ")";
   }
 }
 
@@ -1445,6 +1693,7 @@ async function fetchDailyMax(spot){
   return Math.max(...data.hourly.temperature_2m);
 }
 
+let hotspotWinner = null, hotspotFailed = false;
 async function loadWorldHotspot(){
   const titleEl = document.getElementById("hotspot-title");
   try{
@@ -1453,10 +1702,12 @@ async function loadWorldHotspot(){
       return { spot, max };
     }));
     maxes.sort((a, b) => b.max - a.max);
-    const winner = maxes[0];
-    titleEl.innerHTML = `Aujourd'hui, l'endroit le plus chaud parmi ces zones extrêmes est <b>${winner.spot.name}, ${winner.spot.country}</b> — <b>${winner.max.toFixed(1)}°C</b> prévus`;
+    hotspotWinner = maxes[0];
+    hotspotFailed = false;
+    titleEl.innerHTML = t("hotspotResult", hotspotWinner.spot.name, hotspotWinner.spot.country, hotspotWinner.max.toFixed(1));
   }catch(err){
-    titleEl.textContent = "Impossible de calculer le point le plus chaud du monde pour le moment.";
+    hotspotFailed = true;
+    titleEl.textContent = t("hotspotError");
   }
 }
 
@@ -1492,6 +1743,7 @@ async function fetchDailyMin(spot){
   return Math.min(...data.hourly.temperature_2m);
 }
 
+let coldspotWinner = null, coldspotFailed = false;
 async function loadWorldColdspot(){
   const titleEl = document.getElementById("coldspot-title");
   try{
@@ -1500,27 +1752,41 @@ async function loadWorldColdspot(){
       return { spot, min };
     }));
     mins.sort((a, b) => a.min - b.min);
-    const winner = mins[0];
-    titleEl.innerHTML = `Aujourd'hui, l'endroit le plus froid parmi ces zones extrêmes est <b>${winner.spot.name}, ${winner.spot.country}</b> — <b>${winner.min.toFixed(1)}°C</b> prévus`;
+    coldspotWinner = mins[0];
+    coldspotFailed = false;
+    titleEl.innerHTML = t("coldspotResult", coldspotWinner.spot.name, coldspotWinner.spot.country, coldspotWinner.min.toFixed(1));
   }catch(err){
-    titleEl.textContent = "Impossible de calculer le point le plus froid du monde pour le moment.";
+    coldspotFailed = true;
+    titleEl.textContent = t("coldspotError");
   }
 }
 
-function updateSubtitle(){
-  const subtitleEl = document.getElementById("subtitle");
-  if(viewDay === "tomorrow"){
-    subtitleEl.textContent = "Prévisions horaires de demain pour les villes sélectionnées. Tu as aussi l'heure locale.";
-  } else if(viewDay === "afterTomorrow"){
-    subtitleEl.textContent = "Prévisions horaires d'après-demain pour les villes sélectionnées. Tu as aussi l'heure locale.";
-  } else if(viewDay === "threeDays"){
-    subtitleEl.textContent = "Prévisions horaires sur 3 jours d'affilée, sur un seul graphique. Tu as aussi l'heure locale.";
-  } else if(viewDay === "sevenDays"){
-    subtitleEl.textContent = "Prévisions horaires sur 7 jours d'affilée, sur un seul graphique. Au-delà de 2-3 jours, la précision d'Open-Meteo diminue — à prendre comme une tendance plutôt qu'une prévision fine.";
-  } else {
-    subtitleEl.textContent = "Sélectionne n'importe quelle ville dans le monde et compare les températures du jour, en direct. Tu as aussi l'heure locale.";
+function refreshHotspotTexts(){
+  const hotspotTitleEl = document.getElementById("hotspot-title");
+  if(hotspotTitleEl){
+    if(hotspotWinner){
+      hotspotTitleEl.innerHTML = t("hotspotResult", hotspotWinner.spot.name, hotspotWinner.spot.country, hotspotWinner.max.toFixed(1));
+    } else if(hotspotFailed){
+      hotspotTitleEl.textContent = t("hotspotError");
+    } else {
+      hotspotTitleEl.textContent = t("hotspotCalculating");
+    }
+  }
+  const coldspotTitleEl = document.getElementById("coldspot-title");
+  if(coldspotTitleEl){
+    if(coldspotWinner){
+      coldspotTitleEl.innerHTML = t("coldspotResult", coldspotWinner.spot.name, coldspotWinner.spot.country, coldspotWinner.min.toFixed(1));
+    } else if(coldspotFailed){
+      coldspotTitleEl.textContent = t("coldspotError");
+    } else {
+      coldspotTitleEl.textContent = t("coldspotCalculating");
+    }
   }
 }
+
+document.querySelectorAll(".lang-btn").forEach(btn => {
+  btn.addEventListener("click", () => setLang(btn.dataset.lang));
+});
 
 document.querySelectorAll(".day-toggle-btn").forEach(btn => {
   btn.addEventListener("click", () => {
@@ -1534,6 +1800,11 @@ document.querySelectorAll(".day-toggle-btn").forEach(btn => {
 
 // ---------- Init from URL ----------
 (function init(){
+  document.documentElement.lang = lang;
+  document.querySelectorAll(".lang-btn").forEach(b => b.classList.toggle("active", b.dataset.lang === lang));
+  applyStaticTranslations();
+  refreshHotspotTexts();
+
   const params = new URLSearchParams(window.location.search);
 
   // Accès simple par API (ex : appli mobile, raccourci) : passe directement des coordonnées
