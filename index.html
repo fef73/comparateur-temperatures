@@ -929,6 +929,7 @@ function addCity(c){
 
 function removeCity(id){
   cities = cities.filter(c => c.id !== id);
+  hiddenCityIds.delete(id);
   renderChips();
   syncUrl();
   loadAndRender();
@@ -1514,6 +1515,7 @@ async function loadAndRender(){
       tension: 0.35,
       fill: false,
       maxIndex: r.temps.indexOf(Math.max(...r.temps)),
+      hidden: hiddenCityIds.has(r.city.id),
     }));
 
     datasets.push({
@@ -1612,13 +1614,12 @@ async function loadAndRender(){
       plugins: [maxCrossPlugin],
     });
 
-    buildCards(results);
+    buildCards(results.filter(r => !hiddenCityIds.has(r.city.id)));
 
 
     lastResults = results;
     tickClocks();
-    hiddenCityIds = new Set();
-    buildPeriodBulletin(results);
+    buildPeriodBulletin(results.filter(r => !hiddenCityIds.has(r.city.id)));
 
     // charge (avec cache par coordonnées, une seule fois par ville) les statistiques
     // annuelles de canicule/gel/vent fort/pollution, et remplit les cartes dès réponse
