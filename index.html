@@ -1259,6 +1259,37 @@ function truncateName(name, max = 10){
   return name.length > max ? name.slice(0, max - 1) + "…" : name;
 }
 
+// Plugin Chart.js : dessine une croix (×) sur chaque courbe de ville, à son point de
+// température la plus élevée pour la période actuellement affichée. Ignore les lignes de
+// seuil (canicule/gel) et les villes masquées via la légende.
+const maxCrossPlugin = {
+  id: "maxCrossPlugin",
+  afterDatasetsDraw(chartInstance){
+    const { ctx } = chartInstance;
+    chartInstance.data.datasets.forEach((ds, i) => {
+      if(ds.isThreshold || ds.maxIndex == null) return;
+      if(!chartInstance.isDatasetVisible(i)) return;
+      const meta = chartInstance.getDatasetMeta(i);
+      const point = meta.data[ds.maxIndex];
+      if(!point) return;
+      const size = 6;
+      ctx.save();
+      ctx.strokeStyle = ds.borderColor || "#f3f6f9";
+      ctx.lineWidth = 2.5;
+      ctx.lineCap = "round";
+      ctx.shadowColor = "rgba(11,22,34,0.85)";
+      ctx.shadowBlur = 3;
+      ctx.beginPath();
+      ctx.moveTo(point.x - size, point.y - size);
+      ctx.lineTo(point.x + size, point.y + size);
+      ctx.moveTo(point.x + size, point.y - size);
+      ctx.lineTo(point.x - size, point.y + size);
+      ctx.stroke();
+      ctx.restore();
+    });
+  }
+};
+
 // Seuils utilisés pour les alertes du bulletin de la période sélectionnée (aujourd'hui/demain/etc.)
 const PERIOD_CANICULE_SEUIL = 35;
 const PERIOD_GEL_SEUIL = 0;
@@ -1417,6 +1448,7 @@ async function loadAndRender(){
       pointHoverRadius: 4,
       tension: 0.35,
       fill: false,
+      maxIndex: r.temps.indexOf(Math.max(...r.temps)),
     }));
 
     datasets.push({
@@ -1431,6 +1463,7 @@ async function loadAndRender(){
       tension: 0,
       fill: false,
       order: -1,
+      isThreshold: true,
     });
 
     datasets.push({
@@ -1445,6 +1478,7 @@ async function loadAndRender(){
       tension: 0,
       fill: false,
       order: -1,
+      isThreshold: true,
     });
 
     if(chart) chart.destroy();
@@ -1508,6 +1542,7 @@ async function loadAndRender(){
           },
         },
       },
+      plugins: [maxCrossPlugin],
     });
 
     cardsEl.innerHTML = results.map(r => {
