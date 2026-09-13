@@ -50,6 +50,7 @@
     display:flex; gap:4px; background:var(--bg-input); border:1px solid var(--hairline);
     border-radius:8px; padding:3px;
   }
+  .switches-row{display:flex; gap:8px;}
   .lang-btn{
     font-family:'IBM Plex Mono', monospace; font-size:11px; font-weight:600; letter-spacing:.04em;
     color:var(--text-lo); background:transparent; border:none; border-radius:6px;
@@ -387,9 +388,15 @@
   <header>
     <div class="header-top-row">
       <div class="eyebrow"><span class="pulse"></span> données en direct — open-meteo</div>
-      <div class="lang-switch">
-        <button class="lang-btn" data-lang="fr">FR</button>
-        <button class="lang-btn" data-lang="en">EN</button>
+      <div class="switches-row">
+        <div class="lang-switch">
+          <button class="lang-btn" data-lang="fr">FR</button>
+          <button class="lang-btn" data-lang="en">EN</button>
+        </div>
+        <div class="lang-switch" id="unit-switch">
+          <button class="lang-btn" data-unit="C">°C</button>
+          <button class="lang-btn" data-unit="F">°F</button>
+        </div>
       </div>
     </div>
     <h1>Prévisions Météo Multisites</h1>
@@ -543,33 +550,33 @@ const TRANSLATIONS = {
     aqiAvgLabel: "🌫️ AQI moyen (7j)",
     aqiAvgTitle: "Moyenne des indices de qualité de l'air (AQI) maximaux quotidiens, sur les 7 derniers jours complets.",
     yearlyHeader: "Extrêmes sur 365 jours",
-    yearlyInfoTooltip: (c, g, v, a) => `Nombre de jours, sur les 365 derniers jours, où : la température maximale a atteint ${c}°C ou plus (canicule) ; la température minimale est descendue à ${g}°C ou moins (gel) ; la rafale de vent maximale a atteint ${v} km/h ou plus (vent fort) ; l'indice de qualité de l'air européen a atteint ${a} ou plus (pollution). Données historiques Open-Meteo, mesurées à l'emplacement exact de cette ville.`,
-    yearlyCaniculeLabel: (c) => `🔥 canicule (≥${c}°C)`,
-    yearlyCaniculeTitle: (c) => `Jours où la température maximale a atteint ${c}°C ou plus, sur les 365 derniers jours.`,
-    yearlyGelLabel: (g) => `❄️ gel (≤${g}°C)`,
-    yearlyGelTitle: (g) => `Jours où la température minimale est descendue à ${g}°C ou moins, sur les 365 derniers jours.`,
+    yearlyInfoTooltip: (c, g, v, a, u) => `Nombre de jours, sur les 365 derniers jours, où : la température maximale a atteint ${c}${u} ou plus (canicule) ; la température minimale est descendue à ${g}${u} ou moins (gel) ; la rafale de vent maximale a atteint ${v} km/h ou plus (vent fort) ; l'indice de qualité de l'air européen a atteint ${a} ou plus (pollution). Données historiques Open-Meteo, mesurées à l'emplacement exact de cette ville.`,
+    yearlyCaniculeLabel: (c, u) => `🔥 canicule (≥${c}${u})`,
+    yearlyCaniculeTitle: (c, u) => `Jours où la température maximale a atteint ${c}${u} ou plus, sur les 365 derniers jours.`,
+    yearlyGelLabel: (g, u) => `❄️ gel (≤${g}${u})`,
+    yearlyGelTitle: (g, u) => `Jours où la température minimale est descendue à ${g}${u} ou moins, sur les 365 derniers jours.`,
     yearlyVentLabel: (v) => `💨 vent rafales ≥${v} km/h`,
     yearlyVentTitle: (v) => `Jours où la rafale de vent maximale a atteint ${v} km/h ou plus, sur les 365 derniers jours.`,
     yearlyPollutionLabel: (a) => `🌫️ pollution (AQI ≥${a})`,
     yearlyPollutionTitle: (a) => `Jours où l'indice de qualité de l'air européen (AQI) a atteint ${a} ou plus (mauvaise qualité d'air et au-delà), sur les 365 derniers jours.`,
     yearlyNote: "Sur les 365 derniers jours, à cet endroit précis (archives Open-Meteo)",
-    thresholdCanicule: (c) => `Seuil canicule (${c}°C)`,
-    thresholdGel: (g) => `Seuil de gel (${g}°C)`,
+    thresholdCanicule: (c, u) => `Seuil canicule (${c}${u})`,
+    thresholdGel: (g, u) => `Seuil de gel (${g}${u})`,
     periodToday: "aujourd'hui", periodTomorrow: "demain", periodAfterTomorrow: "après-demain",
     periodThreeDays: "sur les 3 prochains jours", periodSevenDays: "sur les 7 prochains jours",
     bulletinHeader: (label) => `📅 bulletin — ${label}`,
-    bulletinLead: (city, temp, label) => `${city} tient la tête ${label} avec ${temp}°C`,
-    bulletinColdSuffix: (city, temp) => `, tandis que ${city} est la plus fraîche avec ${temp}°C`,
-    bulletinCaniculeAlert: (city, max, label, threshold) => `${city} : pic à ${max}°C ${label}, seuil canicule (${threshold}°C) dépassé.`,
-    bulletinGelAlert: (city, min, label) => `${city} : minimale de ${min}°C ${label}, risque de gel.`,
+    bulletinLead: (city, temp, label, u) => `${city} tient la tête ${label} avec ${temp}${u}`,
+    bulletinColdSuffix: (city, temp, u) => `, tandis que ${city} est la plus fraîche avec ${temp}${u}`,
+    bulletinCaniculeAlert: (city, max, label, threshold, u) => `${city} : pic à ${max}${u} ${label}, seuil canicule (${threshold}${u}) dépassé.`,
+    bulletinGelAlert: (city, min, label, u) => `${city} : minimale de ${min}${u} ${label}, risque de gel.`,
     aqiHistoryHeader: (a) => `🌫️ historique pollution — 7 derniers jours (AQI ≥ ${a})`,
     aqiHistoryCount: (n, a) => ` · ${n}/7 j ≥${a}`,
     hotspotCalculating: "Calcul du point le plus chaud du monde…",
-    hotspotResult: (name, country, temp) => `Aujourd'hui, l'endroit le plus chaud parmi ces zones extrêmes est <b>${name}, ${country}</b> — <b>${temp}°C</b> prévus`,
+    hotspotResult: (name, country, temp, u) => `Aujourd'hui, l'endroit le plus chaud parmi ces zones extrêmes est <b>${name}, ${country}</b> — <b>${temp}${u}</b> prévus`,
     hotspotError: "Impossible de calculer le point le plus chaud du monde pour le moment.",
     hotspotNote: "Estimé à partir d'une sélection de zones connues pour la chaleur extrême (déserts et régions records) — pas une recherche exhaustive de toutes les villes du monde.",
     coldspotCalculating: "Calcul du point le plus froid du monde…",
-    coldspotResult: (name, country, temp) => `Aujourd'hui, l'endroit le plus froid parmi ces zones extrêmes est <b>${name}, ${country}</b> — <b>${temp}°C</b> prévus`,
+    coldspotResult: (name, country, temp, u) => `Aujourd'hui, l'endroit le plus froid parmi ces zones extrêmes est <b>${name}, ${country}</b> — <b>${temp}${u}</b> prévus`,
     coldspotError: "Impossible de calculer le point le plus froid du monde pour le moment.",
     coldspotNote: "Estimé à partir d'une sélection de zones connues pour le froid extrême (Sibérie, Arctique, Antarctique, stations polaires) — pas une recherche exhaustive de toutes les villes du monde.",
     footerSource: "Source : Open-Meteo.com (géocodage + prévisions horaires, sans clé API) · Fuseau horaire local à chaque ville",
@@ -615,33 +622,33 @@ const TRANSLATIONS = {
     aqiAvgLabel: "🌫️ Avg AQI (7d)",
     aqiAvgTitle: "Average of the daily maximum air quality index (AQI), over the last 7 complete days.",
     yearlyHeader: "Extremes over 365 days",
-    yearlyInfoTooltip: (c, g, v, a) => `Number of days, over the last 365 days, where: the maximum temperature reached ${c}°C or more (heatwave); the minimum temperature dropped to ${g}°C or less (frost); the maximum wind gust reached ${v} km/h or more (strong wind); the European air quality index reached ${a} or more (pollution). Historical Open-Meteo data, measured at this city's exact location.`,
-    yearlyCaniculeLabel: (c) => `🔥 heatwave (≥${c}°C)`,
-    yearlyCaniculeTitle: (c) => `Days where the maximum temperature reached ${c}°C or more, over the last 365 days.`,
-    yearlyGelLabel: (g) => `❄️ frost (≤${g}°C)`,
-    yearlyGelTitle: (g) => `Days where the minimum temperature dropped to ${g}°C or less, over the last 365 days.`,
+    yearlyInfoTooltip: (c, g, v, a, u) => `Number of days, over the last 365 days, where: the maximum temperature reached ${c}${u} or more (heatwave); the minimum temperature dropped to ${g}${u} or less (frost); the maximum wind gust reached ${v} km/h or more (strong wind); the European air quality index reached ${a} or more (pollution). Historical Open-Meteo data, measured at this city's exact location.`,
+    yearlyCaniculeLabel: (c, u) => `🔥 heatwave (≥${c}${u})`,
+    yearlyCaniculeTitle: (c, u) => `Days where the maximum temperature reached ${c}${u} or more, over the last 365 days.`,
+    yearlyGelLabel: (g, u) => `❄️ frost (≤${g}${u})`,
+    yearlyGelTitle: (g, u) => `Days where the minimum temperature dropped to ${g}${u} or less, over the last 365 days.`,
     yearlyVentLabel: (v) => `💨 wind gusts ≥${v} km/h`,
     yearlyVentTitle: (v) => `Days where the maximum wind gust reached ${v} km/h or more, over the last 365 days.`,
     yearlyPollutionLabel: (a) => `🌫️ pollution (AQI ≥${a})`,
     yearlyPollutionTitle: (a) => `Days where the European air quality index (AQI) reached ${a} or more (poor air quality and beyond), over the last 365 days.`,
     yearlyNote: "Over the last 365 days, at this exact location (Open-Meteo archives)",
-    thresholdCanicule: (c) => `Heatwave threshold (${c}°C)`,
-    thresholdGel: (g) => `Frost threshold (${g}°C)`,
+    thresholdCanicule: (c, u) => `Heatwave threshold (${c}${u})`,
+    thresholdGel: (g, u) => `Frost threshold (${g}${u})`,
     periodToday: "today", periodTomorrow: "tomorrow", periodAfterTomorrow: "the day after tomorrow",
     periodThreeDays: "over the next 3 days", periodSevenDays: "over the next 7 days",
     bulletinHeader: (label) => `📅 bulletin — ${label}`,
-    bulletinLead: (city, temp, label) => `${city} is in the lead ${label} with ${temp}°C`,
-    bulletinColdSuffix: (city, temp) => `, while ${city} is the coolest at ${temp}°C`,
-    bulletinCaniculeAlert: (city, max, label, threshold) => `${city}: peaked at ${max}°C ${label}, past the heatwave threshold (${threshold}°C).`,
-    bulletinGelAlert: (city, min, label) => `${city}: low of ${min}°C ${label}, frost risk.`,
+    bulletinLead: (city, temp, label, u) => `${city} is in the lead ${label} with ${temp}${u}`,
+    bulletinColdSuffix: (city, temp, u) => `, while ${city} is the coolest at ${temp}${u}`,
+    bulletinCaniculeAlert: (city, max, label, threshold, u) => `${city}: peaked at ${max}${u} ${label}, past the heatwave threshold (${threshold}${u}).`,
+    bulletinGelAlert: (city, min, label, u) => `${city}: low of ${min}${u} ${label}, frost risk.`,
     aqiHistoryHeader: (a) => `🌫️ pollution history — last 7 days (AQI ≥ ${a})`,
     aqiHistoryCount: (n, a) => ` · ${n}/7 d ≥${a}`,
     hotspotCalculating: "Calculating the world's hottest spot…",
-    hotspotResult: (name, country, temp) => `Today, the hottest spot among these extreme zones is <b>${name}, ${country}</b> — <b>${temp}°C</b> expected`,
+    hotspotResult: (name, country, temp, u) => `Today, the hottest spot among these extreme zones is <b>${name}, ${country}</b> — <b>${temp}${u}</b> expected`,
     hotspotError: "Unable to calculate the world's hottest spot right now.",
     hotspotNote: "Estimated from a curated selection of locations known for extreme heat (deserts and record-holding regions) — not an exhaustive search of every city in the world.",
     coldspotCalculating: "Calculating the world's coldest spot…",
-    coldspotResult: (name, country, temp) => `Today, the coldest spot among these extreme zones is <b>${name}, ${country}</b> — <b>${temp}°C</b> expected`,
+    coldspotResult: (name, country, temp, u) => `Today, the coldest spot among these extreme zones is <b>${name}, ${country}</b> — <b>${temp}${u}</b> expected`,
     coldspotError: "Unable to calculate the world's coldest spot right now.",
     coldspotNote: "Estimated from a curated selection of locations known for extreme cold (Siberia, Arctic, Antarctic, polar stations) — not an exhaustive search of every city in the world.",
     footerSource: "Source: Open-Meteo.com (geocoding + hourly forecasts, no API key) · Local time zone for each city",
@@ -655,6 +662,14 @@ const TRANSLATIONS = {
 };
 
 let lang = localStorage.getItem("comparateur-lang") || (navigator.language && navigator.language.startsWith("en") ? "en" : "fr");
+
+let tempUnit = localStorage.getItem("comparateur-unit") || "C";
+function convTemp(c){
+  return tempUnit === "F" ? (c * 9 / 5 + 32) : c;
+}
+function unitSuffix(){
+  return tempUnit === "F" ? "°F" : "°C";
+}
 
 // Horodatage de la génération de ce fichier — mis à jour manuellement à chaque nouvelle version.
 const GENERATION_TIMESTAMP = "09/09/2026 13:43";
@@ -671,12 +686,23 @@ function setLang(newLang){
   lang = newLang;
   localStorage.setItem("comparateur-lang", lang);
   document.documentElement.lang = lang;
-  document.querySelectorAll(".lang-btn").forEach(b => b.classList.toggle("active", b.dataset.lang === lang));
+  document.querySelectorAll(".lang-btn[data-lang]").forEach(b => b.classList.toggle("active", b.dataset.lang === lang));
   applyStaticTranslations();
   renderChips();
   refreshHotspotTexts();
   // Recharge et reconstruit tout (graphique, cartes, bulletin) dans la nouvelle langue —
   // plus simple et plus sûr qu'une reconstruction partielle à partir du cache.
+  loadAndRender();
+}
+
+function setTempUnit(newUnit){
+  if(newUnit !== "C" && newUnit !== "F") return;
+  if(newUnit === tempUnit) return;
+  tempUnit = newUnit;
+  localStorage.setItem("comparateur-unit", tempUnit);
+  document.querySelectorAll(".lang-btn[data-unit]").forEach(b => b.classList.toggle("active", b.dataset.unit === tempUnit));
+  refreshHotspotTexts();
+  // Même logique que le changement de langue : reconstruit tout avec l'unité choisie.
   loadAndRender();
 }
 
@@ -1176,7 +1202,7 @@ function currentIndexFor(r){
 }
 
 function currentTempFor(r){
-  return r.temps[currentIndexFor(r)];
+  return convTemp(r.temps[currentIndexFor(r)]);
 }
 
 function currentWeatherEmojiFor(r){
@@ -1267,19 +1293,19 @@ function buildPeriodBulletin(results){
   const coldest = stats.reduce((a, b) => b.min < a.min ? b : a);
   const label = periodLabel();
 
-  let summaryText = t("bulletinLead", periodCityLabel(hottest.city), hottest.max.toFixed(1), label);
+  let summaryText = t("bulletinLead", periodCityLabel(hottest.city), convTemp(hottest.max).toFixed(1), label, unitSuffix());
   if(coldest.city.id !== hottest.city.id){
-    summaryText += t("bulletinColdSuffix", periodCityLabel(coldest.city), coldest.min.toFixed(1));
+    summaryText += t("bulletinColdSuffix", periodCityLabel(coldest.city), convTemp(coldest.min).toFixed(1), unitSuffix());
   }
   summaryText += ".";
 
   const alerts = [];
   stats.forEach(s => {
     if(s.max >= PERIOD_CANICULE_SEUIL){
-      alerts.push({ type: "canicule", icon: "🔥", text: t("bulletinCaniculeAlert", periodCityLabel(s.city), s.max.toFixed(1), label, PERIOD_CANICULE_SEUIL) });
+      alerts.push({ type: "canicule", icon: "🔥", text: t("bulletinCaniculeAlert", periodCityLabel(s.city), convTemp(s.max).toFixed(1), label, Math.round(convTemp(PERIOD_CANICULE_SEUIL)), unitSuffix()) });
     }
     if(s.min <= PERIOD_GEL_SEUIL){
-      alerts.push({ type: "gel", icon: "❄️", text: t("bulletinGelAlert", periodCityLabel(s.city), s.min.toFixed(1), label) });
+      alerts.push({ type: "gel", icon: "❄️", text: t("bulletinGelAlert", periodCityLabel(s.city), convTemp(s.min).toFixed(1), label, unitSuffix()) });
     }
   });
 
@@ -1382,7 +1408,7 @@ async function loadAndRender(){
     const datasets = results.map(r => ({
       label: r.city.name,
       cityId: r.city.id,
-      data: r.temps,
+      data: r.temps.map(v => convTemp(v)),
       weatherCodes: r.weatherCodes,
       borderColor: r.city.color,
       backgroundColor: r.city.color,
@@ -1394,8 +1420,8 @@ async function loadAndRender(){
     }));
 
     datasets.push({
-      label: t("thresholdCanicule", 35),
-      data: labels.map(() => 35),
+      label: t("thresholdCanicule", Math.round(convTemp(35)), unitSuffix()),
+      data: labels.map(() => convTemp(35)),
       borderColor: "#ff3b3b",
       backgroundColor: "#ff3b3b",
       borderWidth: 1.5,
@@ -1408,8 +1434,8 @@ async function loadAndRender(){
     });
 
     datasets.push({
-      label: t("thresholdGel", 0),
-      data: labels.map(() => 0),
+      label: t("thresholdGel", Math.round(convTemp(0)), unitSuffix()),
+      data: labels.map(() => convTemp(0)),
       borderColor: "#48cae4",
       backgroundColor: "#48cae4",
       borderWidth: 1.5,
@@ -1461,12 +1487,12 @@ async function loadAndRender(){
             borderWidth: 1,
             titleFont: { family: "IBM Plex Mono" },
             bodyFont: { family: "IBM Plex Mono" },
-            filter: (item) => item.dataset.label !== t("thresholdCanicule", 35) && item.dataset.label !== t("thresholdGel", 0),
+            filter: (item) => item.dataset.label !== t("thresholdCanicule", Math.round(convTemp(35)), unitSuffix()) && item.dataset.label !== t("thresholdGel", Math.round(convTemp(0)), unitSuffix()),
             callbacks: {
               label: (item) => {
                 const codes = item.dataset.weatherCodes;
                 const icon = codes ? weatherEmoji(codes[item.dataIndex]) + " " : "";
-                return ` ${icon}${truncateName(item.dataset.label, 10)}: ${item.formattedValue}°C`;
+                return ` ${icon}${truncateName(item.dataset.label, 10)}: ${item.formattedValue}${unitSuffix()}`;
               }
             }
           },
@@ -1478,7 +1504,7 @@ async function loadAndRender(){
           },
           y: {
             grid: { color: "#1a2c40" },
-            ticks: { color: "#8fa4b8", font: { family:"IBM Plex Mono", size: 11 }, callback: v => v + "°" },
+            ticks: { color: "#8fa4b8", font: { family:"IBM Plex Mono", size: 11 }, callback: v => v + unitSuffix() },
           },
         },
       },
@@ -1489,8 +1515,8 @@ async function loadAndRender(){
       const icon = currentWeatherEmojiFor(r);
       const humidity = currentHumidityFor(r);
       const wind = currentWindFor(r);
-      const min = Math.min(...r.temps).toFixed(1);
-      const max = Math.max(...r.temps).toFixed(1);
+      const min = convTemp(Math.min(...r.temps)).toFixed(1);
+      const max = convTemp(Math.max(...r.temps)).toFixed(1);
       const region = [r.city.admin1, r.city.country].filter(Boolean).join(", ");
       const regionWithAlt = region + (r.city.elevation != null ? (region ? " · " : "") + r.city.elevation + " m" : "");
       return `
@@ -1505,18 +1531,18 @@ async function loadAndRender(){
           <div class="card-temp-row">
             <span class="card-icon" id="icon-${r.city.id}">${icon}</span>
             <div class="card-temp"><span id="temp-${r.city.id}">${currentTemp.toFixed(1)}</span><span class="unit">${
-              viewDay === "today" ? (lang === "en" ? "°C now" : "°C actuellement")
-              : viewDay === "tomorrow" ? (lang === "en" ? "°C tomorrow at noon" : "°C demain à midi")
-              : viewDay === "afterTomorrow" ? (lang === "en" ? "°C day after tomorrow at noon" : "°C après-demain à midi")
-              : (lang === "en" ? "°C now" : "°C actuellement")
+              viewDay === "today" ? (lang === "en" ? `${unitSuffix()} now` : `${unitSuffix()} actuellement`)
+              : viewDay === "tomorrow" ? (lang === "en" ? `${unitSuffix()} tomorrow at noon` : `${unitSuffix()} demain à midi`)
+              : viewDay === "afterTomorrow" ? (lang === "en" ? `${unitSuffix()} day after tomorrow at noon` : `${unitSuffix()} après-demain à midi`)
+              : (lang === "en" ? `${unitSuffix()} now` : `${unitSuffix()} actuellement`)
             }</span></div>
           </div>
           <div class="card-humidity">💧 ${t("cardHumidity")} <b id="hum-${r.city.id}">${humidity != null ? humidity + "%" : "--"}</b></div>
           <div class="card-wind">💨 ${t("cardWind")} <b id="wind-${r.city.id}">${wind.speed != null ? wind.speed + " km/h" + (wind.direction ? " " + wind.direction : "") : "--"}</b></div>
           <div class="card-sun">☀️ ${t("cardSun")} <b>${r.solarNoon || "--"}</b></div>
           <div class="card-range">
-            <span>${t("cardMin")} <b>${min}°</b></span>
-            <span>${t("cardMax")} <b>${max}°</b></span>
+            <span>${t("cardMin")} <b>${min}${unitSuffix()}</b></span>
+            <span>${t("cardMax")} <b>${max}${unitSuffix()}</b></span>
           </div>
           <div class="card-aqi-avg" title="${t("aqiAvgTitle")}">
             <span>${t("aqiAvgLabel")}</span>
@@ -1524,14 +1550,14 @@ async function loadAndRender(){
           </div>
           <div class="card-yearly-header">
             <span>${t("yearlyHeader")}</span>
-            <i class="cy-info" title="${t("yearlyInfoTooltip", CANICULE_SEUIL_ANNUEL, GEL_SEUIL_ANNUEL, VENT_SEUIL_ANNUEL, AQI_SEUIL_ANNUEL)}">i</i>
+            <i class="cy-info" title="${t("yearlyInfoTooltip", Math.round(convTemp(CANICULE_SEUIL_ANNUEL)), Math.round(convTemp(GEL_SEUIL_ANNUEL)), VENT_SEUIL_ANNUEL, AQI_SEUIL_ANNUEL, unitSuffix())}">i</i>
           </div>
-          <div class="card-yearly" title="${t("yearlyCaniculeTitle", CANICULE_SEUIL_ANNUEL)}">
-            <span class="cy-label">${t("yearlyCaniculeLabel", CANICULE_SEUIL_ANNUEL)}</span>
+          <div class="card-yearly" title="${t("yearlyCaniculeTitle", Math.round(convTemp(CANICULE_SEUIL_ANNUEL)), unitSuffix())}">
+            <span class="cy-label">${t("yearlyCaniculeLabel", Math.round(convTemp(CANICULE_SEUIL_ANNUEL)), unitSuffix())}</span>
             <b id="yearly-canicule-${r.city.id}">…</b>
           </div>
-          <div class="card-yearly" title="${t("yearlyGelTitle", GEL_SEUIL_ANNUEL)}">
-            <span class="cy-label">${t("yearlyGelLabel", GEL_SEUIL_ANNUEL)}</span>
+          <div class="card-yearly" title="${t("yearlyGelTitle", Math.round(convTemp(GEL_SEUIL_ANNUEL)), unitSuffix())}">
+            <span class="cy-label">${t("yearlyGelLabel", Math.round(convTemp(GEL_SEUIL_ANNUEL)), unitSuffix())}</span>
             <b id="yearly-gel-${r.city.id}">…</b>
           </div>
           <div class="card-yearly" title="${t("yearlyVentTitle", VENT_SEUIL_ANNUEL)}">
@@ -1713,7 +1739,7 @@ async function loadWorldHotspot(){
     maxes.sort((a, b) => b.max - a.max);
     hotspotWinner = maxes[0];
     hotspotFailed = false;
-    titleEl.innerHTML = t("hotspotResult", hotspotWinner.spot.name, hotspotWinner.spot.country, hotspotWinner.max.toFixed(1));
+    titleEl.innerHTML = t("hotspotResult", hotspotWinner.spot.name, hotspotWinner.spot.country, convTemp(hotspotWinner.max).toFixed(1), unitSuffix());
   }catch(err){
     hotspotFailed = true;
     titleEl.textContent = t("hotspotError");
@@ -1763,7 +1789,7 @@ async function loadWorldColdspot(){
     mins.sort((a, b) => a.min - b.min);
     coldspotWinner = mins[0];
     coldspotFailed = false;
-    titleEl.innerHTML = t("coldspotResult", coldspotWinner.spot.name, coldspotWinner.spot.country, coldspotWinner.min.toFixed(1));
+    titleEl.innerHTML = t("coldspotResult", coldspotWinner.spot.name, coldspotWinner.spot.country, convTemp(coldspotWinner.min).toFixed(1), unitSuffix());
   }catch(err){
     coldspotFailed = true;
     titleEl.textContent = t("coldspotError");
@@ -1774,7 +1800,7 @@ function refreshHotspotTexts(){
   const hotspotTitleEl = document.getElementById("hotspot-title");
   if(hotspotTitleEl){
     if(hotspotWinner){
-      hotspotTitleEl.innerHTML = t("hotspotResult", hotspotWinner.spot.name, hotspotWinner.spot.country, hotspotWinner.max.toFixed(1));
+      hotspotTitleEl.innerHTML = t("hotspotResult", hotspotWinner.spot.name, hotspotWinner.spot.country, convTemp(hotspotWinner.max).toFixed(1), unitSuffix());
     } else if(hotspotFailed){
       hotspotTitleEl.textContent = t("hotspotError");
     } else {
@@ -1784,7 +1810,7 @@ function refreshHotspotTexts(){
   const coldspotTitleEl = document.getElementById("coldspot-title");
   if(coldspotTitleEl){
     if(coldspotWinner){
-      coldspotTitleEl.innerHTML = t("coldspotResult", coldspotWinner.spot.name, coldspotWinner.spot.country, coldspotWinner.min.toFixed(1));
+      coldspotTitleEl.innerHTML = t("coldspotResult", coldspotWinner.spot.name, coldspotWinner.spot.country, convTemp(coldspotWinner.min).toFixed(1), unitSuffix());
     } else if(coldspotFailed){
       coldspotTitleEl.textContent = t("coldspotError");
     } else {
@@ -1793,8 +1819,11 @@ function refreshHotspotTexts(){
   }
 }
 
-document.querySelectorAll(".lang-btn").forEach(btn => {
+document.querySelectorAll(".lang-btn[data-lang]").forEach(btn => {
   btn.addEventListener("click", () => setLang(btn.dataset.lang));
+});
+document.querySelectorAll(".lang-btn[data-unit]").forEach(btn => {
+  btn.addEventListener("click", () => setTempUnit(btn.dataset.unit));
 });
 
 document.querySelectorAll(".day-toggle-btn").forEach(btn => {
@@ -1810,7 +1839,8 @@ document.querySelectorAll(".day-toggle-btn").forEach(btn => {
 // ---------- Init from URL ----------
 (function init(){
   document.documentElement.lang = lang;
-  document.querySelectorAll(".lang-btn").forEach(b => b.classList.toggle("active", b.dataset.lang === lang));
+  document.querySelectorAll(".lang-btn[data-lang]").forEach(b => b.classList.toggle("active", b.dataset.lang === lang));
+  document.querySelectorAll(".lang-btn[data-unit]").forEach(b => b.classList.toggle("active", b.dataset.unit === tempUnit));
   applyStaticTranslations();
   refreshHotspotTexts();
 
