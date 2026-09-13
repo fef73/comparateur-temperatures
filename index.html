@@ -1397,6 +1397,71 @@ function renderRecentAqiHistory(results){
   });
 }
 
+function buildCards(results){
+  document.getElementById("cards").innerHTML = results.map(r => {
+      const currentTemp = currentTempFor(r);
+      const icon = currentWeatherEmojiFor(r);
+      const humidity = currentHumidityFor(r);
+      const wind = currentWindFor(r);
+      const min = convTemp(Math.min(...r.temps)).toFixed(1);
+      const max = convTemp(Math.max(...r.temps)).toFixed(1);
+      const region = [r.city.admin1, r.city.country].filter(Boolean).join(", ");
+      const regionWithAlt = region + (r.city.elevation != null ? (region ? " · " : "") + r.city.elevation + " m" : "");
+      return `
+        <div class="card" style="--accent:${r.city.color}">
+          <div class="card-top-row">
+            <div>
+              <div class="card-city">${r.city.name}</div>
+              <div class="card-region">${regionWithAlt}</div>
+            </div>
+            ${(viewDay === "today" || viewDay === "threeDays" || viewDay === "sevenDays") ? `<div class="card-time" id="time-${r.city.id}">${formatLocalTime(r.utcOffsetSeconds)}</div>` : ""}
+          </div>
+          <div class="card-temp-row">
+            <span class="card-icon" id="icon-${r.city.id}">${icon}</span>
+            <div class="card-temp"><span id="temp-${r.city.id}">${currentTemp.toFixed(1)}</span><span class="unit">${
+              viewDay === "today" ? (lang === "en" ? `${unitSuffix()} now` : `${unitSuffix()} actuellement`)
+              : viewDay === "tomorrow" ? (lang === "en" ? `${unitSuffix()} tomorrow at noon` : `${unitSuffix()} demain à midi`)
+              : viewDay === "afterTomorrow" ? (lang === "en" ? `${unitSuffix()} day after tomorrow at noon` : `${unitSuffix()} après-demain à midi`)
+              : (lang === "en" ? `${unitSuffix()} now` : `${unitSuffix()} actuellement`)
+            }</span></div>
+          </div>
+          <div class="card-humidity">💧 ${t("cardHumidity")} <b id="hum-${r.city.id}">${humidity != null ? humidity + "%" : "--"}</b></div>
+          <div class="card-wind">💨 ${t("cardWind")} <b id="wind-${r.city.id}">${wind.speed != null ? wind.speed + " km/h" + (wind.direction ? " " + wind.direction : "") : "--"}</b></div>
+          <div class="card-sun">☀️ ${t("cardSun")} <b>${r.solarNoon || "--"}</b></div>
+          <div class="card-range">
+            <span>${t("cardMin")} <b>${min}${unitSuffix()}</b></span>
+            <span>${t("cardMax")} <b>${max}${unitSuffix()}</b></span>
+          </div>
+          <div class="card-aqi-avg" title="${t("aqiAvgTitle")}">
+            <span>${t("aqiAvgLabel")}</span>
+            <b id="aqi-avg-${r.city.id}">…</b>
+          </div>
+          <div class="card-yearly-header">
+            <span>${t("yearlyHeader")}</span>
+            <i class="cy-info" title="${t("yearlyInfoTooltip", Math.round(convTemp(CANICULE_SEUIL_ANNUEL)), Math.round(convTemp(GEL_SEUIL_ANNUEL)), VENT_SEUIL_ANNUEL, AQI_SEUIL_ANNUEL, unitSuffix())}">i</i>
+          </div>
+          <div class="card-yearly" title="${t("yearlyCaniculeTitle", Math.round(convTemp(CANICULE_SEUIL_ANNUEL)), unitSuffix())}">
+            <span class="cy-label">${t("yearlyCaniculeLabel", Math.round(convTemp(CANICULE_SEUIL_ANNUEL)), unitSuffix())}</span>
+            <b id="yearly-canicule-${r.city.id}">…</b>
+          </div>
+          <div class="card-yearly" title="${t("yearlyGelTitle", Math.round(convTemp(GEL_SEUIL_ANNUEL)), unitSuffix())}">
+            <span class="cy-label">${t("yearlyGelLabel", Math.round(convTemp(GEL_SEUIL_ANNUEL)), unitSuffix())}</span>
+            <b id="yearly-gel-${r.city.id}">…</b>
+          </div>
+          <div class="card-yearly" title="${t("yearlyVentTitle", VENT_SEUIL_ANNUEL)}">
+            <span class="cy-label">${t("yearlyVentLabel", VENT_SEUIL_ANNUEL)}</span>
+            <b id="yearly-vent-${r.city.id}">…</b>
+          </div>
+          <div class="card-yearly" title="${t("yearlyPollutionTitle", AQI_SEUIL_ANNUEL)}">
+            <span class="cy-label">${t("yearlyPollutionLabel", AQI_SEUIL_ANNUEL)}</span>
+            <b id="yearly-aqi-${r.city.id}">…</b>
+          </div>
+          <div class="card-yearly-note">${t("yearlyNote")}</div>
+        </div>
+      `;
+  }).join("");
+}
+
 async function loadAndRender(){
   const statusEl = document.getElementById("chart-status");
   const cardsEl = document.getElementById("cards");
@@ -1511,7 +1576,9 @@ async function loadAndRender(){
               // affichées sur le graphique (celles pas masquées via la légende).
               if(ds.cityId){
                 if(meta.hidden){ hiddenCityIds.add(ds.cityId); } else { hiddenCityIds.delete(ds.cityId); }
-                buildPeriodBulletin(lastResults.filter(r => !hiddenCityIds.has(r.city.id)));
+                const visibleResults = lastResults.filter(r => !hiddenCityIds.has(r.city.id));
+                buildPeriodBulletin(visibleResults);
+                buildCards(visibleResults);
               }
             },
           },
@@ -1545,68 +1612,8 @@ async function loadAndRender(){
       plugins: [maxCrossPlugin],
     });
 
-    cardsEl.innerHTML = results.map(r => {
-      const currentTemp = currentTempFor(r);
-      const icon = currentWeatherEmojiFor(r);
-      const humidity = currentHumidityFor(r);
-      const wind = currentWindFor(r);
-      const min = convTemp(Math.min(...r.temps)).toFixed(1);
-      const max = convTemp(Math.max(...r.temps)).toFixed(1);
-      const region = [r.city.admin1, r.city.country].filter(Boolean).join(", ");
-      const regionWithAlt = region + (r.city.elevation != null ? (region ? " · " : "") + r.city.elevation + " m" : "");
-      return `
-        <div class="card" style="--accent:${r.city.color}">
-          <div class="card-top-row">
-            <div>
-              <div class="card-city">${r.city.name}</div>
-              <div class="card-region">${regionWithAlt}</div>
-            </div>
-            ${(viewDay === "today" || viewDay === "threeDays" || viewDay === "sevenDays") ? `<div class="card-time" id="time-${r.city.id}">${formatLocalTime(r.utcOffsetSeconds)}</div>` : ""}
-          </div>
-          <div class="card-temp-row">
-            <span class="card-icon" id="icon-${r.city.id}">${icon}</span>
-            <div class="card-temp"><span id="temp-${r.city.id}">${currentTemp.toFixed(1)}</span><span class="unit">${
-              viewDay === "today" ? (lang === "en" ? `${unitSuffix()} now` : `${unitSuffix()} actuellement`)
-              : viewDay === "tomorrow" ? (lang === "en" ? `${unitSuffix()} tomorrow at noon` : `${unitSuffix()} demain à midi`)
-              : viewDay === "afterTomorrow" ? (lang === "en" ? `${unitSuffix()} day after tomorrow at noon` : `${unitSuffix()} après-demain à midi`)
-              : (lang === "en" ? `${unitSuffix()} now` : `${unitSuffix()} actuellement`)
-            }</span></div>
-          </div>
-          <div class="card-humidity">💧 ${t("cardHumidity")} <b id="hum-${r.city.id}">${humidity != null ? humidity + "%" : "--"}</b></div>
-          <div class="card-wind">💨 ${t("cardWind")} <b id="wind-${r.city.id}">${wind.speed != null ? wind.speed + " km/h" + (wind.direction ? " " + wind.direction : "") : "--"}</b></div>
-          <div class="card-sun">☀️ ${t("cardSun")} <b>${r.solarNoon || "--"}</b></div>
-          <div class="card-range">
-            <span>${t("cardMin")} <b>${min}${unitSuffix()}</b></span>
-            <span>${t("cardMax")} <b>${max}${unitSuffix()}</b></span>
-          </div>
-          <div class="card-aqi-avg" title="${t("aqiAvgTitle")}">
-            <span>${t("aqiAvgLabel")}</span>
-            <b id="aqi-avg-${r.city.id}">…</b>
-          </div>
-          <div class="card-yearly-header">
-            <span>${t("yearlyHeader")}</span>
-            <i class="cy-info" title="${t("yearlyInfoTooltip", Math.round(convTemp(CANICULE_SEUIL_ANNUEL)), Math.round(convTemp(GEL_SEUIL_ANNUEL)), VENT_SEUIL_ANNUEL, AQI_SEUIL_ANNUEL, unitSuffix())}">i</i>
-          </div>
-          <div class="card-yearly" title="${t("yearlyCaniculeTitle", Math.round(convTemp(CANICULE_SEUIL_ANNUEL)), unitSuffix())}">
-            <span class="cy-label">${t("yearlyCaniculeLabel", Math.round(convTemp(CANICULE_SEUIL_ANNUEL)), unitSuffix())}</span>
-            <b id="yearly-canicule-${r.city.id}">…</b>
-          </div>
-          <div class="card-yearly" title="${t("yearlyGelTitle", Math.round(convTemp(GEL_SEUIL_ANNUEL)), unitSuffix())}">
-            <span class="cy-label">${t("yearlyGelLabel", Math.round(convTemp(GEL_SEUIL_ANNUEL)), unitSuffix())}</span>
-            <b id="yearly-gel-${r.city.id}">…</b>
-          </div>
-          <div class="card-yearly" title="${t("yearlyVentTitle", VENT_SEUIL_ANNUEL)}">
-            <span class="cy-label">${t("yearlyVentLabel", VENT_SEUIL_ANNUEL)}</span>
-            <b id="yearly-vent-${r.city.id}">…</b>
-          </div>
-          <div class="card-yearly" title="${t("yearlyPollutionTitle", AQI_SEUIL_ANNUEL)}">
-            <span class="cy-label">${t("yearlyPollutionLabel", AQI_SEUIL_ANNUEL)}</span>
-            <b id="yearly-aqi-${r.city.id}">…</b>
-          </div>
-          <div class="card-yearly-note">${t("yearlyNote")}</div>
-        </div>
-      `;
-    }).join("");
+    buildCards(results);
+
 
     lastResults = results;
     tickClocks();
