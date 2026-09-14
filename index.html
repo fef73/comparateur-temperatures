@@ -228,6 +228,7 @@
     font-size:11.5px; color:var(--text-lo); margin-top:8px; cursor:pointer;
   }
   .card-aqi-avg b{color:var(--text-hi); font-weight:500;}
+  .card-aqi-avg b.aqi-avg-bad{color:#ff6b6b;}
   .card-aqi-avg .aqi-caret{opacity:.6; font-size:9px; margin-left:6px;}
   .aqi-detail-panel{
     display:none; flex-wrap:wrap; gap:6px; margin-top:8px; padding-top:8px;
@@ -1824,15 +1825,17 @@ async function loadAndRender(){
         const avgEl = document.getElementById("aqi-avg-" + r.city.id);
         if(avgEl){
           if(stats.days.length){
-            const avg = stats.days.reduce((sum, d) => sum + d.aqiMax, 0) / stats.days.length;
-            avgEl.textContent = Math.round(avg);
+            const avg = Math.round(stats.days.reduce((sum, d) => sum + d.aqiMax, 0) / stats.days.length);
+            avgEl.textContent = avg;
+            avgEl.classList.toggle("aqi-avg-bad", avg > AQI_SEUIL_ANNUEL);
           } else {
             avgEl.textContent = "--";
+            avgEl.classList.remove("aqi-avg-bad");
           }
         }
       }).catch(() => {
         const avgEl = document.getElementById("aqi-avg-" + r.city.id);
-        if(avgEl) avgEl.textContent = "--";
+        if(avgEl){ avgEl.textContent = "--"; avgEl.classList.remove("aqi-avg-bad"); }
       });
     });
 
