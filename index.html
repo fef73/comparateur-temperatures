@@ -385,6 +385,31 @@
   }
   .coldspot-banner .hotspot-title b{color:var(--azure, #457b9d);}
 
+  .features-panel{ margin-top:22px; }
+  .features-panel details{
+    background:var(--bg-panel); border:1px solid var(--hairline); border-radius:16px;
+    padding:4px 22px;
+  }
+  .features-panel summary{
+    cursor:pointer; padding:15px 0; font-family:'Space Grotesk', sans-serif; font-size:15px; font-weight:500;
+    color:var(--text-hi); list-style:none; display:flex; align-items:center; gap:9px; user-select:none;
+  }
+  .features-panel summary::-webkit-details-marker{display:none;}
+  .features-panel summary::before{
+    content:"▸"; color:var(--live); font-size:13px; transition:transform .15s ease; display:inline-block;
+  }
+  .features-panel details[open] summary::before{transform:rotate(90deg);}
+  .features-panel .features-body{padding:2px 0 20px;}
+  .features-panel h3{
+    font-family:'IBM Plex Mono', monospace; font-size:11px; letter-spacing:.08em; text-transform:uppercase;
+    color:var(--live); margin:18px 0 8px;
+  }
+  .features-panel h3:first-child{margin-top:4px;}
+  .features-panel ul{margin:0; padding-left:20px; font-size:13.5px; line-height:1.7; color:var(--text-hi);}
+  .features-panel li{margin-bottom:4px;}
+  .features-panel li b{color:var(--text-hi); font-weight:600;}
+  .features-panel .f-dim{color:var(--text-lo);}
+
   .signature{
     position:fixed; right:18px; bottom:18px; z-index:30;
     display:flex; align-items:center; gap:8px;
@@ -506,6 +531,8 @@
       <div class="hotspot-note">Estimé à partir d'une sélection de zones connues pour le froid extrême (Sibérie, Arctique, Antarctique, stations polaires) — pas une recherche exhaustive de toutes les villes du monde.</div>
     </div>
   </div>
+
+  <div class="features-panel" id="features-panel"></div>
 
   <footer>
     <span id="footer-source-line">Source : Open-Meteo.com (géocodage + prévisions horaires, sans clé API) · Fuseau horaire local à chaque ville<br>
@@ -777,7 +804,100 @@ function setTempUnit(newUnit){
   loadAndRender();
 }
 
+// ---------- Panneau "Fonctionnalités du site" ----------
+const FEATURES_CONTENT = {
+  fr: `
+    <details>
+      <summary>ℹ️ Fonctionnalités du site</summary>
+      <div class="features-body">
+        <h3>🔍 Sélection des villes</h3>
+        <ul>
+          <li>Recherche de n'importe quelle ville au monde (géocodage Open-Meteo), plusieurs villes en simultané</li>
+          <li>Altitude précise optionnelle par ville (stations de ski, points en montagne) — une même ville peut être ajoutée à plusieurs altitudes différentes</li>
+          <li>Villes retirables individuellement (chips avec ×)</li>
+        </ul>
+        <h3>📊 Graphique de comparaison</h3>
+        <ul>
+          <li>5 périodes : aujourd'hui, demain, après-demain, 3 jours, 7 jours</li>
+          <li>Une courbe par ville, plus les seuils canicule (35°C) et gel (0°C)</li>
+          <li>Croix sur le pic de chaque courbe · clic sur la légende pour masquer/afficher une ville · tooltip avec icône météo au survol</li>
+        </ul>
+        <h3>🗂️ Cartes par ville</h3>
+        <ul>
+          <li>Température actuelle (ou à midi pour demain/après-demain), icône météo, heure locale en direct</li>
+          <li>Humidité, vent (vitesse + direction), heure du soleil au zénith, min/max de la période</li>
+          <li><b>AQI moyen (7j)</b> cliquable, en rouge si &gt;60, avec détail par polluant (PM2.5, PM10, Ozone, NO₂, SO₂ — rouge si seuil santé OMS dépassé) et par pollen (bouleau, graminées, olivier, ambroisie, aulne, armoise — rouge si risque allergique)</li>
+          <li>Extrêmes sur 365 jours : nb de jours de canicule, gel, vent fort (rafales ≥60 km/h), pollution</li>
+        </ul>
+        <h3>📅 Bulletin de la période</h3>
+        <ul>
+          <li>Ville la plus chaude / la plus fraîche pour la période sélectionnée, avec alertes canicule/gel</li>
+          <li>Historique pollution des 7 derniers jours par ville</li>
+        </ul>
+        <h3>🌍 Extrêmes mondiaux</h3>
+        <ul>
+          <li>Point le plus chaud et le plus froid du monde, calculés en direct sur une sélection de lieux connus pour leurs extrêmes</li>
+        </ul>
+        <h3>⚙️ Confort d'usage</h3>
+        <ul>
+          <li>FR/EN, °C/°F, lien partageable (conserve la sélection), accès direct par URL avec coordonnées GPS</li>
+          <li class="f-dim">Rafraîchissement automatique toutes les 15 minutes</li>
+        </ul>
+      </div>
+    </details>
+  `,
+  en: `
+    <details>
+      <summary>ℹ️ Site features</summary>
+      <div class="features-body">
+        <h3>🔍 City selection</h3>
+        <ul>
+          <li>Search any city in the world (Open-Meteo geocoding), several cities at once</li>
+          <li>Optional precise altitude per city (ski resorts, mountain spots) — the same city can be added at several different altitudes</li>
+          <li>Cities can be removed individually (chips with ×)</li>
+        </ul>
+        <h3>📊 Comparison chart</h3>
+        <ul>
+          <li>5 periods: today, tomorrow, day after tomorrow, 3 days, 7 days</li>
+          <li>One line per city, plus heatwave (35°C) and frost (0°C) thresholds</li>
+          <li>A cross marks each line's peak · click a city in the legend to show/hide it · tooltip with weather icon on hover</li>
+        </ul>
+        <h3>🗂️ Per-city cards</h3>
+        <ul>
+          <li>Current temperature (or noon for tomorrow/day after), weather icon, live local time</li>
+          <li>Humidity, wind (speed + direction), solar noon, period min/max</li>
+          <li>Clickable <b>Avg AQI (7d)</b>, red if &gt;60, with per-pollutant detail (PM2.5, PM10, Ozone, NO₂, SO₂ — red past the WHO health guideline) and per-pollen detail (birch, grass, olive, ragweed, alder, mugwort — red past the allergy-risk marker)</li>
+          <li>365-day extremes: number of heatwave, frost, strong wind (gusts ≥60 km/h) and pollution days</li>
+        </ul>
+        <h3>📅 Period bulletin</h3>
+        <ul>
+          <li>Hottest / coolest city for the selected period, with heatwave/frost alerts</li>
+          <li>7-day pollution history per city</li>
+        </ul>
+        <h3>🌍 World extremes</h3>
+        <ul>
+          <li>World's hottest and coldest spot, computed live from a curated selection of extreme locations</li>
+        </ul>
+        <h3>⚙️ Convenience</h3>
+        <ul>
+          <li>FR/EN, °C/°F, shareable link (keeps your selection), direct URL access with GPS coordinates</li>
+          <li class="f-dim">Automatic refresh every 15 minutes</li>
+        </ul>
+      </div>
+    </details>
+  `,
+};
+
+function renderFeatures(){
+  const el = document.getElementById("features-panel");
+  if(!el) return;
+  const wasOpen = el.querySelector("details") ? el.querySelector("details").open : false;
+  el.innerHTML = FEATURES_CONTENT[lang] || FEATURES_CONTENT.fr;
+  if(wasOpen) el.querySelector("details").open = true;
+}
+
 function applyStaticTranslations(){
+  renderFeatures();
   document.querySelector(".eyebrow").innerHTML = `<span class="pulse"></span> ${t("eyebrow")}`;
   document.querySelector("h1").textContent = t("title");
   document.querySelectorAll(".day-toggle-btn").forEach(btn => {
