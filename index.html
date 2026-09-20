@@ -562,6 +562,14 @@
     </div>
   </div>
 
+  <div class="hotspot-banner smog-banner" id="smog-france-banner">
+    <div class="hotspot-icon">🌫️</div>
+    <div class="hotspot-body">
+      <div class="hotspot-title" id="smog-france-title">Calcul de la ville la plus polluée de France…</div>
+      <div class="hotspot-note">Estimé à partir d'une sélection de grandes villes françaises — pas une recherche exhaustive de toutes les villes de France.</div>
+    </div>
+  </div>
+
   <div class="features-panel" id="features-panel"></div>
 
   <footer>
@@ -701,6 +709,10 @@ const TRANSLATIONS = {
     smogEuropeResult: (name, country, aqi) => `Aujourd'hui, l'endroit le plus pollué parmi ces grandes villes d'Europe est <b>${name}, ${country}</b> — indice de qualité de l'air (AQI) de <b>${aqi}</b>`,
     smogEuropeError: "Impossible de calculer le point le plus pollué d'Europe pour le moment.",
     smogEuropeNote: "Estimé à partir d'une sélection de grandes villes européennes connues pour leur pollution atmosphérique — pas une recherche exhaustive de toutes les villes d'Europe.",
+    smogFranceCalculating: "Calcul de la ville la plus polluée de France…",
+    smogFranceResult: (name, aqi) => `Aujourd'hui, la ville la plus polluée parmi ces grandes villes françaises est <b>${name}</b> — indice de qualité de l'air (AQI) de <b>${aqi}</b>`,
+    smogFranceError: "Impossible de calculer la ville la plus polluée de France pour le moment.",
+    smogFranceNote: "Estimé à partir d'une sélection de grandes villes françaises — pas une recherche exhaustive de toutes les villes de France.",
     footerSource: "Source : Open-Meteo.com (géocodage + prévisions horaires, sans clé API) · Fuseau horaire local à chaque ville",
     footerShareNote: "Le lien partagé conserve ta sélection de villes",
     footerTip1: "💡 Astuce — comparer plusieurs altitudes de la même ville : ajoute-la, saisis une altitude puis clique <b>Valider</b> ; le panneau reste ouvert, saisis une autre altitude et clique à nouveau <b>Valider</b> — répète autant de fois que voulu, puis ferme le panneau avec le <b>×</b>.",
@@ -805,6 +817,10 @@ const TRANSLATIONS = {
     smogEuropeResult: (name, country, aqi) => `Today, the most polluted spot among these major European cities is <b>${name}, ${country}</b> — air quality index (AQI) of <b>${aqi}</b>`,
     smogEuropeError: "Unable to calculate Europe's most polluted spot right now.",
     smogEuropeNote: "Estimated from a curated selection of major European cities known for air pollution — not an exhaustive search of every city in Europe.",
+    smogFranceCalculating: "Calculating France's most polluted city…",
+    smogFranceResult: (name, aqi) => `Today, the most polluted city among these major French cities is <b>${name}</b> — air quality index (AQI) of <b>${aqi}</b>`,
+    smogFranceError: "Unable to calculate France's most polluted city right now.",
+    smogFranceNote: "Estimated from a curated selection of major French cities — not an exhaustive search of every city in France.",
     footerSource: "Source: Open-Meteo.com (geocoding + hourly forecasts, no API key) · Local time zone for each city",
     footerShareNote: "The shared link keeps your city selection",
     footerTip1: "💡 Tip — comparing several altitudes of the same city: add it, enter an altitude then click <b>Confirm</b>; the panel stays open, enter another altitude and click <b>Confirm</b> again — repeat as many times as you like, then close the panel with <b>×</b>.",
@@ -990,6 +1006,8 @@ function applyStaticTranslations(){
   if(smogNote) smogNote.textContent = t("smogNote");
   const smogEuropeNote = document.querySelector("#smog-europe-banner .hotspot-note");
   if(smogEuropeNote) smogEuropeNote.textContent = t("smogEuropeNote");
+  const smogFranceNote = document.querySelector("#smog-france-banner .hotspot-note");
+  if(smogFranceNote) smogFranceNote.textContent = t("smogFranceNote");
   const footer = document.querySelector("footer");
   if(footer){
     const sourceLine = document.getElementById("footer-source-line");
@@ -2130,6 +2148,7 @@ document.getElementById("refresh-btn").addEventListener("click", () => {
   loadWorldColdspot();
   loadWorldSmog();
   loadWorldSmogEurope();
+  loadWorldSmogFrance();
 });
 function nativeShareLink(){
   syncUrl();
@@ -2386,6 +2405,48 @@ async function loadWorldSmogEurope(){
   }
 }
 
+// ---------- France smog (curated major French cities) ----------
+const POLLUTED_FRANCE = [
+  { name:"Paris", lat:48.8566, lon:2.3522 },
+  { name:"Lyon", lat:45.7640, lon:4.8357 },
+  { name:"Marseille", lat:43.2965, lon:5.3698 },
+  { name:"Grenoble", lat:45.1885, lon:5.7245 },
+  { name:"Strasbourg", lat:48.5734, lon:7.7521 },
+  { name:"Lille", lat:50.6292, lon:3.0573 },
+  { name:"Toulouse", lat:43.6047, lon:1.4442 },
+  { name:"Nice", lat:43.7102, lon:7.2620 },
+  { name:"Bordeaux", lat:44.8378, lon:-0.5792 },
+  { name:"Nantes", lat:47.2184, lon:-1.5536 },
+  { name:"Rouen", lat:49.4432, lon:1.0999 },
+  { name:"Le Havre", lat:49.4944, lon:0.1079 },
+  { name:"Dunkerque", lat:51.0343, lon:2.3768 },
+  { name:"Fos-sur-Mer", lat:43.4392, lon:4.9483 },
+  { name:"Clermont-Ferrand", lat:45.7772, lon:3.0870 },
+  { name:"Montpellier", lat:43.6108, lon:3.8767 },
+  { name:"Nancy", lat:48.6921, lon:6.1844 },
+  { name:"Metz", lat:49.1193, lon:6.1757 },
+  { name:"Reims", lat:49.2583, lon:4.0317 },
+  { name:"Annecy", lat:45.8992, lon:6.1294 },
+];
+
+let smogFranceWinner = null, smogFranceFailed = false;
+async function loadWorldSmogFrance(){
+  const titleEl = document.getElementById("smog-france-title");
+  try{
+    const values = await Promise.all(POLLUTED_FRANCE.map(async spot => {
+      const aqi = await fetchCurrentAqi(spot);
+      return { spot, aqi };
+    }));
+    values.sort((a, b) => b.aqi - a.aqi);
+    smogFranceWinner = values[0];
+    smogFranceFailed = false;
+    titleEl.innerHTML = t("smogFranceResult", smogFranceWinner.spot.name, Math.round(smogFranceWinner.aqi));
+  }catch(err){
+    smogFranceFailed = true;
+    titleEl.textContent = t("smogFranceError");
+  }
+}
+
 function refreshHotspotTexts(){
   const hotspotTitleEl = document.getElementById("hotspot-title");
   if(hotspotTitleEl){
@@ -2425,6 +2486,16 @@ function refreshHotspotTexts(){
       smogEuropeTitleEl.textContent = t("smogEuropeError");
     } else {
       smogEuropeTitleEl.textContent = t("smogEuropeCalculating");
+    }
+  }
+  const smogFranceTitleEl = document.getElementById("smog-france-title");
+  if(smogFranceTitleEl){
+    if(smogFranceWinner){
+      smogFranceTitleEl.innerHTML = t("smogFranceResult", smogFranceWinner.spot.name, Math.round(smogFranceWinner.aqi));
+    } else if(smogFranceFailed){
+      smogFranceTitleEl.textContent = t("smogFranceError");
+    } else {
+      smogFranceTitleEl.textContent = t("smogFranceCalculating");
     }
   }
 }
@@ -2492,12 +2563,14 @@ document.querySelectorAll(".day-toggle-btn").forEach(btn => {
     loadWorldColdspot();
     loadWorldSmog();
     loadWorldSmogEurope();
+    loadWorldSmogFrance();
     setInterval(loadAndRender, 15 * 60 * 1000);
     setInterval(tickClocks, 30 * 1000);
     setInterval(loadWorldHotspot, 30 * 60 * 1000);
     setInterval(loadWorldColdspot, 30 * 60 * 1000);
     setInterval(loadWorldSmog, 30 * 60 * 1000);
     setInterval(loadWorldSmogEurope, 30 * 60 * 1000);
+    setInterval(loadWorldSmogFrance, 30 * 60 * 1000);
   }
 
   let apiCities = null;
