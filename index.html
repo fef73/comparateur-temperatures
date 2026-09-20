@@ -392,6 +392,12 @@
     border:1px solid rgba(69,123,157,0.4);
   }
   .coldspot-banner .hotspot-title b{color:var(--azure, #457b9d);}
+  .smog-banner{
+    margin-top:12px;
+    background:linear-gradient(135deg, rgba(143,164,184,0.16), rgba(143,164,184,0.05));
+    border:1px solid rgba(143,164,184,0.4);
+  }
+  .smog-banner .hotspot-title b{color:#c3ccd6;}
 
   .features-panel{ margin-top:22px; }
   .features-panel details{
@@ -540,6 +546,14 @@
     </div>
   </div>
 
+  <div class="hotspot-banner smog-banner" id="smog-banner">
+    <div class="hotspot-icon">🌫️</div>
+    <div class="hotspot-body">
+      <div class="hotspot-title" id="smog-title">Calcul du point le plus pollué du monde…</div>
+      <div class="hotspot-note">Estimé à partir d'une sélection de grandes villes connues pour leur pollution atmosphérique élevée — pas une recherche exhaustive de toutes les villes du monde.</div>
+    </div>
+  </div>
+
   <div class="features-panel" id="features-panel"></div>
 
   <footer>
@@ -671,6 +685,10 @@ const TRANSLATIONS = {
     coldspotResult: (name, country, temp, u) => `Aujourd'hui, l'endroit le plus froid parmi ces zones extrêmes est <b>${name}, ${country}</b> — <b>${temp}${u}</b> prévus`,
     coldspotError: "Impossible de calculer le point le plus froid du monde pour le moment.",
     coldspotNote: "Estimé à partir d'une sélection de zones connues pour le froid extrême (Sibérie, Arctique, Antarctique, stations polaires) — pas une recherche exhaustive de toutes les villes du monde.",
+    smogCalculating: "Calcul du point le plus pollué du monde…",
+    smogResult: (name, country, aqi) => `Aujourd'hui, l'endroit le plus pollué parmi ces grandes villes est <b>${name}, ${country}</b> — indice de qualité de l'air (AQI) de <b>${aqi}</b>`,
+    smogError: "Impossible de calculer le point le plus pollué du monde pour le moment.",
+    smogNote: "Estimé à partir d'une sélection de grandes villes connues pour leur pollution atmosphérique élevée — pas une recherche exhaustive de toutes les villes du monde.",
     footerSource: "Source : Open-Meteo.com (géocodage + prévisions horaires, sans clé API) · Fuseau horaire local à chaque ville",
     footerShareNote: "Le lien partagé conserve ta sélection de villes",
     footerTip1: "💡 Astuce — comparer plusieurs altitudes de la même ville : ajoute-la, saisis une altitude puis clique <b>Valider</b> ; le panneau reste ouvert, saisis une autre altitude et clique à nouveau <b>Valider</b> — répète autant de fois que voulu, puis ferme le panneau avec le <b>×</b>.",
@@ -767,6 +785,10 @@ const TRANSLATIONS = {
     coldspotResult: (name, country, temp, u) => `Today, the coldest spot among these extreme zones is <b>${name}, ${country}</b> — <b>${temp}${u}</b> expected`,
     coldspotError: "Unable to calculate the world's coldest spot right now.",
     coldspotNote: "Estimated from a curated selection of locations known for extreme cold (Siberia, Arctic, Antarctic, polar stations) — not an exhaustive search of every city in the world.",
+    smogCalculating: "Calculating the world's most polluted spot…",
+    smogResult: (name, country, aqi) => `Today, the most polluted spot among these major cities is <b>${name}, ${country}</b> — air quality index (AQI) of <b>${aqi}</b>`,
+    smogError: "Unable to calculate the world's most polluted spot right now.",
+    smogNote: "Estimated from a curated selection of major cities known for high air pollution — not an exhaustive search of every city in the world.",
     footerSource: "Source: Open-Meteo.com (geocoding + hourly forecasts, no API key) · Local time zone for each city",
     footerShareNote: "The shared link keeps your city selection",
     footerTip1: "💡 Tip — comparing several altitudes of the same city: add it, enter an altitude then click <b>Confirm</b>; the panel stays open, enter another altitude and click <b>Confirm</b> again — repeat as many times as you like, then close the panel with <b>×</b>.",
@@ -948,6 +970,8 @@ function applyStaticTranslations(){
   if(hotspotNote) hotspotNote.textContent = t("hotspotNote");
   const coldspotNote = document.querySelector("#coldspot-banner .hotspot-note");
   if(coldspotNote) coldspotNote.textContent = t("coldspotNote");
+  const smogNote = document.querySelector("#smog-banner .hotspot-note");
+  if(smogNote) smogNote.textContent = t("smogNote");
   const footer = document.querySelector("footer");
   if(footer){
     const sourceLine = document.getElementById("footer-source-line");
@@ -2086,6 +2110,7 @@ document.getElementById("refresh-btn").addEventListener("click", () => {
   loadAndRender();
   loadWorldHotspot();
   loadWorldColdspot();
+  loadWorldSmog();
 });
 function nativeShareLink(){
   syncUrl();
@@ -2247,6 +2272,58 @@ async function loadWorldColdspot(){
   }
 }
 
+// ---------- World smog (curated high-pollution locations) ----------
+const POLLUTED_HOTSPOTS = [
+  { name:"Delhi", country:"Inde", lat:28.7041, lon:77.1025 },
+  { name:"Lahore", country:"Pakistan", lat:31.5497, lon:74.3436 },
+  { name:"Dhaka", country:"Bangladesh", lat:23.8103, lon:90.4125 },
+  { name:"Kolkata", country:"Inde", lat:22.5726, lon:88.3639 },
+  { name:"Karachi", country:"Pakistan", lat:24.8607, lon:67.0011 },
+  { name:"Kathmandu", country:"Népal", lat:27.7172, lon:85.3240 },
+  { name:"Lucknow", country:"Inde", lat:26.8467, lon:80.9462 },
+  { name:"Patna", country:"Inde", lat:25.5941, lon:85.1376 },
+  { name:"Baghdad", country:"Irak", lat:33.3152, lon:44.3661 },
+  { name:"Le Caire", country:"Égypte", lat:30.0444, lon:31.2357 },
+  { name:"Oulan-Bator", country:"Mongolie", lat:47.8864, lon:106.9057 },
+  { name:"Jakarta", country:"Indonésie", lat:-6.2088, lon:106.8456 },
+  { name:"Hanoï", country:"Vietnam", lat:21.0278, lon:105.8342 },
+  { name:"Lagos", country:"Nigeria", lat:6.5244, lon:3.3792 },
+  { name:"Accra", country:"Ghana", lat:5.6037, lon:-0.1870 },
+  { name:"Kano", country:"Nigeria", lat:12.0022, lon:8.5920 },
+  { name:"Mexico", country:"Mexique", lat:19.4326, lon:-99.1332 },
+  { name:"Santiago", country:"Chili", lat:-33.4489, lon:-70.6693 },
+  { name:"Riyad", country:"Arabie Saoudite", lat:24.7136, lon:46.6753 },
+  { name:"Pékin", country:"Chine", lat:39.9042, lon:116.4074 },
+];
+
+async function fetchCurrentAqi(spot){
+  const url = `https://air-quality-api.open-meteo.com/v1/air-quality?latitude=${spot.lat}&longitude=${spot.lon}&current=european_aqi&timezone=auto`;
+  const res = await fetch(url);
+  if(!res.ok) throw new Error("smog fetch failed");
+  const data = await res.json();
+  const aqi = data.current && data.current.european_aqi;
+  if(aqi == null) throw new Error("smog fetch: no data");
+  return aqi;
+}
+
+let smogWinner = null, smogFailed = false;
+async function loadWorldSmog(){
+  const titleEl = document.getElementById("smog-title");
+  try{
+    const values = await Promise.all(POLLUTED_HOTSPOTS.map(async spot => {
+      const aqi = await fetchCurrentAqi(spot);
+      return { spot, aqi };
+    }));
+    values.sort((a, b) => b.aqi - a.aqi);
+    smogWinner = values[0];
+    smogFailed = false;
+    titleEl.innerHTML = t("smogResult", smogWinner.spot.name, smogWinner.spot.country, Math.round(smogWinner.aqi));
+  }catch(err){
+    smogFailed = true;
+    titleEl.textContent = t("smogError");
+  }
+}
+
 function refreshHotspotTexts(){
   const hotspotTitleEl = document.getElementById("hotspot-title");
   if(hotspotTitleEl){
@@ -2266,6 +2343,16 @@ function refreshHotspotTexts(){
       coldspotTitleEl.textContent = t("coldspotError");
     } else {
       coldspotTitleEl.textContent = t("coldspotCalculating");
+    }
+  }
+  const smogTitleEl = document.getElementById("smog-title");
+  if(smogTitleEl){
+    if(smogWinner){
+      smogTitleEl.innerHTML = t("smogResult", smogWinner.spot.name, smogWinner.spot.country, Math.round(smogWinner.aqi));
+    } else if(smogFailed){
+      smogTitleEl.textContent = t("smogError");
+    } else {
+      smogTitleEl.textContent = t("smogCalculating");
     }
   }
 }
@@ -2331,10 +2418,12 @@ document.querySelectorAll(".day-toggle-btn").forEach(btn => {
     loadAndRender();
     loadWorldHotspot();
     loadWorldColdspot();
+    loadWorldSmog();
     setInterval(loadAndRender, 15 * 60 * 1000);
     setInterval(tickClocks, 30 * 1000);
     setInterval(loadWorldHotspot, 30 * 60 * 1000);
     setInterval(loadWorldColdspot, 30 * 60 * 1000);
+    setInterval(loadWorldSmog, 30 * 60 * 1000);
   }
 
   let apiCities = null;
