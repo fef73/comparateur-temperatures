@@ -1160,7 +1160,7 @@ function syncUrl(){
 // Les attributs title="" ne s'affichent qu'au survol, geste absent sur smartphone.
 // Ce composant remplace ce comportement par un tap/clic universel (PC et mobile).
 (function(){
-  const TAP_TOOLTIP_SELECTOR = ".aqi-chip[title], .aqi-detail-chip[title], .card-yearly[title], .cy-info[title]";
+  const TAP_TOOLTIP_SELECTOR = ".aqi-pop[title], .aqi-hist-pop[title], .aqi-chip[title], .aqi-detail-chip[title], .card-yearly[title], .cy-info[title]";
   let tipEl = null;
   let activeTarget = null;
 
@@ -1511,9 +1511,19 @@ function getBassinPopulation(city){
   const p = (async () => {
     // 1) France ? (tableau vide hors France)
     try{
-      const res = await fetch(`https://geo.api.gouv.fr/communes?lat=${city.lat}&lon=${city.lon}&fields=nom,population,codeEpci`);
-      if(res.ok){
-        const [c] = await res.json();
+      // a) par le NOM (les coordonnées peuvent tomber dans la commune voisine), si proche des coordonnées
+      let c = null;
+      const rn = await fetch(`https://geo.api.gouv.fr/communes?nom=${encodeURIComponent(city.name)}&fields=nom,population,codeEpci,centre&limit=5`);
+      if(rn.ok){
+        const list = await rn.json();
+        c = list.find(x => x.centre && (x.centre.coordinates[1] - city.lat) ** 2 + (x.centre.coordinates[0] - city.lon) ** 2 < 0.04) || null; // < ~20 km
+      }
+      // b) sinon par les coordonnées
+      if(!c){
+        const res = await fetch(`https://geo.api.gouv.fr/communes?lat=${city.lat}&lon=${city.lon}&fields=nom,population,codeEpci`);
+        if(res.ok) [c] = await res.json();
+      }
+      {
         if(c){
           if(c.codeEpci){
             const r2 = await fetch(`https://geo.api.gouv.fr/epcis/${c.codeEpci}?fields=nom,population`);
