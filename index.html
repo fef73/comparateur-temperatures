@@ -230,6 +230,8 @@
   .card-aqi-avg b{color:var(--text-hi); font-weight:500;}
   .card-aqi-avg b.aqi-avg-bad{color:#ff6b6b;}
   .card-aqi-avg .aqi-caret{opacity:.6; font-size:9px; margin-left:6px;}
+  .card-aqi-avg .aqi-pop{margin-left:10px; opacity:.85; cursor:help;}
+  .card-aqi-avg .aqi-pop b{color:var(--text-hi);}
   .aqi-detail-panel{
     display:none; flex-wrap:wrap; gap:6px; margin-top:8px; padding-top:8px;
     border-top:1px dashed var(--hairline);
@@ -685,6 +687,9 @@ const TRANSLATIONS = {
     cardHumidity: "humidité", cardWind: "vent", cardSun: "soleil au plus haut",
     cardMin: "min", cardMax: "max",
     aqiAvgLabel: "🌫️ AQI moyen (7j)",
+    popUnit: "hab.",
+    popTitleEpci: (epci, commune, popC) => `Population du bassin exposé : ${epci} (INSEE). Commune de ${commune} : ${popC} hab.`,
+    popTitleCity: (nom) => `Population de ${nom} (Open-Meteo / GeoNames)`,
     aqiAvgTitle: "Moyenne des indices de qualité de l'air (AQI) maximaux quotidiens, sur les 7 derniers jours complets. Cliquez pour le détail par polluant.",
     aqiDetailPm25: "PM2.5", aqiDetailPm10: "PM10", aqiDetailO3: "Ozone", aqiDetailNo2: "NO₂", aqiDetailSo2: "SO₂",
     aqiDetailError: "détail indisponible",
@@ -809,6 +814,9 @@ const TRANSLATIONS = {
     cardHumidity: "humidity", cardWind: "wind", cardSun: "sun at its highest",
     cardMin: "min", cardMax: "max",
     aqiAvgLabel: "🌫️ Avg AQI (7d)",
+    popUnit: "inh.",
+    popTitleEpci: (epci, commune, popC) => `Exposed population area: ${epci} (INSEE). Town of ${commune}: ${popC} inh.`,
+    popTitleCity: (nom) => `Population of ${nom} (Open-Meteo / GeoNames)`,
     aqiAvgTitle: "Average of the daily maximum air quality index (AQI), over the last 7 complete days. Click for per-pollutant detail.",
     aqiDetailPm25: "PM2.5", aqiDetailPm10: "PM10", aqiDetailO3: "Ozone", aqiDetailNo2: "NO₂", aqiDetailSo2: "SO₂",
     aqiDetailError: "detail unavailable",
@@ -913,7 +921,7 @@ function unitSuffix(){
 }
 
 // Horodatage de la génération de ce fichier — mis à jour manuellement à chaque nouvelle version.
-const GENERATION_TIMESTAMP = "09/09/2026 13:43";
+const GENERATION_TIMESTAMP = "25/09/2026 11:45";
 
 function t(key, ...args){
   const dict = TRANSLATIONS[lang] || TRANSLATIONS.fr;
@@ -1491,6 +1499,49 @@ function getYearlyAqiStats(city){
 
 // Récupère (avec cache par coordonnées) l'historique de qualité de l'air des 7 derniers
 // jours complets (hors aujourd'hui, incomplet), avec le max journalier d'AQI pour chaque jour.
+// ---------- Population du bassin exposé ----------
+// France : intercommunalité (EPCI) via geo.api.gouv.fr — hors France : Open-Meteo Geocoding (GeoNames)
+const populationCache = {};
+function getBassinPopulation(city){
+  const key = city.lat + "," + city.lon;
+  if(populationCache[key]) return populationCache[key];
+  const p = (async () => {
+    // 1) France ? (tableau vide hors France)
+    try{
+      const res = await fetch(`https://geo.api.gouv.fr/communes?lat=${city.lat}&lon=${city.lon}&fields=nom,population,codeEpci`);
+      if(res.ok){
+        const [c] = await res.json();
+        if(c){
+          if(c.codeEpci){
+            const r2 = await fetch(`https://geo.api.gouv.fr/epcis/${c.codeEpci}?fields=nom,population`);
+            if(r2.ok){
+              const e = await r2.json();
+              if(e && e.population) return { pop: e.population, source: "epci", zone: e.nom, commune: c.nom, popCommune: c.population };
+            }
+          }
+          if(c.population) return { pop: c.population, source: "commune", zone: c.nom };
+        }
+      }
+    }catch(err){}
+    // 2) Hors France : Open-Meteo Geocoding, résultat le plus proche des coordonnées
+    const res = await fetch(`https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(city.name)}&count=10&language=${lang}&format=json`);
+    if(!res.ok) return null;
+    const data = await res.json();
+    const cands = (data.results || []).filter(r => r.population);
+    if(!cands.length) return null;
+    const d2 = r => (r.latitude - city.lat) ** 2 + (r.longitude - city.lon) ** 2;
+    const best = cands.reduce((a, b) => d2(b) < d2(a) ? b : a);
+    if(d2(best) > 0.25) return null; // > ~50 km : pas la bonne ville
+    return { pop: best.population, source: "geonames", zone: best.name };
+  })();
+  populationCache[key] = p;
+  p.catch(() => delete populationCache[key]);
+  return p;
+}
+function formatPop(n){
+  return new Intl.NumberFormat(lang === "en" ? "en" : "fr", { notation: "compact", maximumFractionDigits: 1 }).format(n);
+}
+
 const recentAqiCache = {};
 function getRecentAqiHistory(city){
   const key = yearlyStatsKey(city);
@@ -1976,7 +2027,7 @@ function buildCards(results){
             <span>${t("cardMax")} <b>${max}${unitSuffix()}</b></span>
           </div>
           <div class="card-aqi-avg" title="${t("aqiAvgTitle")}" onclick="toggleAqiDetail('${r.city.id}')">
-            <span>${t("aqiAvgLabel")}</span>
+            <span>${t("aqiAvgLabel")}<span class="aqi-pop" id="aqi-pop-${r.city.id}"></span></span>
             <span><b id="aqi-avg-${r.city.id}">…</b><span class="aqi-caret" id="aqi-caret-${r.city.id}">▴</span></span>
           </div>
           <div class="aqi-detail-panel open" id="aqi-detail-${r.city.id}"></div>
@@ -2207,6 +2258,16 @@ async function loadAndRender(){
         const avgEl = document.getElementById("aqi-avg-" + r.city.id);
         if(avgEl){ avgEl.textContent = "--"; avgEl.classList.remove("aqi-avg-bad"); }
       });
+
+      getBassinPopulation(r.city).then(info => {
+        const popEl = document.getElementById("aqi-pop-" + r.city.id);
+        if(!popEl || !info) return;
+        popEl.innerHTML = `· 👥 <b>${formatPop(info.pop)}</b> ${t("popUnit")}`;
+        popEl.title = info.source === "epci"
+          ? t("popTitleEpci", info.zone, info.commune, (info.popCommune || 0).toLocaleString(lang))
+          : t("popTitleCity", info.zone);
+        popEl.onclick = e => e.stopPropagation();
+      }).catch(() => {});
 
       loadAqiDetailPanel(r.city);
     });
