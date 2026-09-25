@@ -979,12 +979,13 @@ const FEATURES_CONTENT = {
           <li>Température actuelle (ou à midi pour demain/après-demain), icône météo, heure locale en direct</li>
           <li>Humidité, vent (vitesse + direction), heure du soleil au zénith, min/max de la période</li>
           <li><b>AQI moyen (7j)</b> cliquable, en rouge si &gt;60, avec détail par polluant (PM2.5, PM10, Ozone, NO₂, SO₂ — rouge si seuil santé OMS dépassé) et par pollen (bouleau, graminées, olivier, ambroisie, aulne, armoise — rouge si risque allergique)</li>
+          <li><b>Population exposée</b> sur la ligne AQI : en France, bassin de l'intercommunalité (EPCI, INSEE via geo.api.gouv.fr) ; hors France, population de la ville (Open-Meteo / GeoNames) — détail commune au survol</li>
           <li>Extrêmes sur 365 jours : nb de jours de canicule, gel, vent fort (rafales ≥60 km/h), pollution</li>
         </ul>
         <h3>📅 Bulletin de la période</h3>
         <ul>
           <li>Ville la plus chaude / la plus fraîche pour la période sélectionnée, avec alertes canicule/gel</li>
-          <li>Historique pollution des 7 derniers jours par ville</li>
+          <li>Historique pollution des 7 derniers jours par ville, avec la population du bassin</li>
         </ul>
         <h3>🌍 Extrêmes mondiaux</h3>
         <ul>
@@ -1019,12 +1020,13 @@ const FEATURES_CONTENT = {
           <li>Current temperature (or noon for tomorrow/day after), weather icon, live local time</li>
           <li>Humidity, wind (speed + direction), solar noon, period min/max</li>
           <li>Clickable <b>Avg AQI (7d)</b>, red if &gt;60, with per-pollutant detail (PM2.5, PM10, Ozone, NO₂, SO₂ — red past the WHO health guideline) and per-pollen detail (birch, grass, olive, ragweed, alder, mugwort — red past the allergy-risk marker)</li>
+          <li><b>Exposed population</b> on the AQI line: in France, the inter-municipal area (EPCI, INSEE via geo.api.gouv.fr); elsewhere, the city's population (Open-Meteo / GeoNames) — town detail on hover</li>
           <li>365-day extremes: number of heatwave, frost, strong wind (gusts ≥60 km/h) and pollution days</li>
         </ul>
         <h3>📅 Period bulletin</h3>
         <ul>
           <li>Hottest / coolest city for the selected period, with heatwave/frost alerts</li>
-          <li>7-day pollution history per city</li>
+          <li>7-day pollution history per city, with area population</li>
         </ul>
         <h3>🌍 World extremes</h3>
         <ul>
