@@ -322,6 +322,7 @@
     display:flex; align-items:center; gap:12px; margin-bottom:9px; flex-wrap:wrap;
   }
   .aqi-city-row:last-child{margin-bottom:0;}
+  .aqi-hist-pop{color:var(--text-lo); cursor:help;}
   .aqi-city-name{
     font-size:12px; font-family:'IBM Plex Mono', monospace; color:var(--text-hi); min-width:150px;
   }
@@ -1538,6 +1539,11 @@ function getBassinPopulation(city){
   p.catch(() => delete populationCache[key]);
   return p;
 }
+function popTitle(info){
+  return info.source === "epci"
+    ? t("popTitleEpci", info.zone, info.commune, (info.popCommune || 0).toLocaleString(lang))
+    : t("popTitleCity", info.zone);
+}
 function formatPop(n){
   return new Intl.NumberFormat(lang === "en" ? "en" : "fr", { notation: "compact", maximumFractionDigits: 1 }).format(n);
 }
@@ -1960,11 +1966,15 @@ function renderRecentAqiHistory(results){
   if(!container) return;
 
   Promise.all(results.map(r =>
-    getRecentAqiHistory(r.city).then(stats => ({ city: r.city, stats, error: null }))
-      .catch(err => ({ city: r.city, stats: null, error: err }))
+    Promise.all([
+      getRecentAqiHistory(r.city).catch(() => null),
+      getBassinPopulation(r.city).catch(() => null),
+    ]).then(([stats, pop]) => ({ city: r.city, stats, pop }))
   )).then(entries => {
-    const rowsHtml = entries.map(({ city, stats }) => {
-      const cityLabel = periodCityLabel(city);
+    const rowsHtml = entries.map(({ city, stats, pop }) => {
+      const cityLabel = periodCityLabel(city) + (pop
+        ? ` <span class="aqi-hist-pop" title="${popTitle(pop).replace(/"/g, "&quot;")}">· 👥 ${formatPop(pop.pop)} ${t("popUnit")}</span>`
+        : "");
       if(!stats){
         return `
           <div class="aqi-city-row">
@@ -2263,9 +2273,7 @@ async function loadAndRender(){
         const popEl = document.getElementById("aqi-pop-" + r.city.id);
         if(!popEl || !info) return;
         popEl.innerHTML = `· 👥 <b>${formatPop(info.pop)}</b> ${t("popUnit")}`;
-        popEl.title = info.source === "epci"
-          ? t("popTitleEpci", info.zone, info.commune, (info.popCommune || 0).toLocaleString(lang))
-          : t("popTitleCity", info.zone);
+        popEl.title = popTitle(info);
         popEl.onclick = e => e.stopPropagation();
       }).catch(() => {});
 
