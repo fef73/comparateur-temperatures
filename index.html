@@ -3,7 +3,24 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Prévisions Météo Multisites</title>
+<title>Comparateur de températures en direct — météo de plusieurs villes, en altitude</title>
+<meta name="description" content="Compare en direct les températures de plusieurs villes du monde, même en altitude (stations de ski) : prévisions sur 7 jours, qualité de l'air, pollens, points les plus chauds et les plus froids. Gratuit, sans inscription.">
+<link rel="canonical" href="https://fef73.github.io/comparateur-temperatures/">
+<meta name="robots" content="index, follow">
+<meta name="theme-color" content="#0b1622">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Comparateur de températures">
+<meta property="og:locale" content="fr_FR">
+<meta property="og:title" content="Comparateur de températures en direct">
+<meta property="og:description" content="Compare la météo de plusieurs villes du monde, même en altitude. Prévisions 7 jours, qualité de l'air, extrêmes du jour.">
+<meta property="og:url" content="https://fef73.github.io/comparateur-temperatures/">
+<meta property="og:image" content="https://fef73.github.io/comparateur-temperatures/og-image.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta name="twitter:card" content="summary_large_image">
+<script type="application/ld+json">
+{"@context":"https://schema.org","@type":"WebApplication","name":"Comparateur de températures","url":"https://fef73.github.io/comparateur-temperatures/","description":"Compare en direct les températures de plusieurs villes du monde, même en altitude (stations de ski) : prévisions sur 7 jours, qualité de l'air, pollens, points les plus chauds et les plus froids. Gratuit, sans inscription.","applicationCategory":"WeatherApplication","operatingSystem":"Tous (navigateur web)","inLanguage":["fr","en"],"isAccessibleForFree":true,"offers":{"@type":"Offer","price":"0","priceCurrency":"EUR"}}
+</script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600;9..144,700&family=Space+Grotesk:wght@400;500;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
@@ -2373,6 +2390,74 @@ function copyShareLink(){
 document.getElementById("share-btn").addEventListener("click", copyShareLink);
 document.getElementById("native-share-btn").addEventListener("click", nativeShareLink);
 
+// ---------- Cache + requêtes groupées pour les bandeaux « extrêmes » ----------
+// Une seule requête Open-Meteo par liste de lieux (coordonnées séparées par des virgules),
+// résultat gardé 1 h dans le navigateur : les visites suivantes ne font aucun appel.
+const EXTREMES_TTL = 60 * 60 * 1000;
+const extremesInflight = {};
+function extremesKey(kind, list){
+  const str = list.map(s => s.lat + "," + s.lon).join(";");
+  let h = 5381;
+  for(let i = 0; i < str.length; i++) h = ((h * 33) ^ str.charCodeAt(i)) >>> 0;
+  return "extremes-" + kind + "-" + h.toString(36);
+}
+function extremesCacheGet(key){
+  try{
+    const o = JSON.parse(localStorage.getItem(key));
+    if(o && Date.now() - o.t < EXTREMES_TTL) return o.v;
+  }catch(e){}
+  return null;
+}
+function extremesCacheSet(key, v){
+  try{ localStorage.setItem(key, JSON.stringify({ t: Date.now(), v })); }catch(e){}
+}
+async function batchedExtremes(kind, list, buildUrl, extract){
+  const key = extremesKey(kind, list);
+  const cached = extremesCacheGet(key);
+  if(cached) return cached;
+  if(extremesInflight[key]) return extremesInflight[key];
+  const lats = list.map(s => s.lat).join(","), lons = list.map(s => s.lon).join(",");
+  extremesInflight[key] = (async () => {
+    try{
+      const res = await fetch(buildUrl(lats, lons));
+      if(!res.ok) throw new Error(kind + " fetch failed");
+      let data = await res.json();
+      if(!Array.isArray(data)) data = [data];
+      const values = data.map(extract);
+      extremesCacheSet(key, values);
+      return values;
+    } finally {
+      delete extremesInflight[key];
+    }
+  })();
+  return extremesInflight[key];
+}
+// → [{max, min}] pour chaque lieu (températures horaires du jour local)
+function getDailyExtremes(list){
+  return batchedExtremes("temp", list,
+    (lats, lons) => `https://api.open-meteo.com/v1/forecast?latitude=${lats}&longitude=${lons}&hourly=temperature_2m&forecast_days=1&timezone=auto`,
+    d => {
+      const temps = d.hourly.temperature_2m.filter(v => v != null);
+      return { max: Math.max(...temps), min: Math.min(...temps) };
+    });
+}
+// → [aqi | null] pour chaque lieu
+function getCurrentAqis(list){
+  return batchedExtremes("aqi", list,
+    (lats, lons) => `https://air-quality-api.open-meteo.com/v1/air-quality?latitude=${lats}&longitude=${lons}&current=european_aqi&timezone=auto`,
+    d => (d.current && d.current.european_aqi != null) ? d.current.european_aqi : null);
+}
+async function rankTemps(list, field){
+  const ext = await getDailyExtremes(list);
+  return ext.map((e, i) => ({ spot: list[i], [field]: e[field] })).filter(x => isFinite(x[field]));
+}
+async function rankAqis(list){
+  const aqis = await getCurrentAqis(list);
+  const values = aqis.map((aqi, i) => ({ spot: list[i], aqi })).filter(x => x.aqi != null);
+  if(!values.length) throw new Error("smog fetch: no data");
+  return values;
+}
+
 // ---------- World hotspot (curated extreme-heat locations) ----------
 const HEAT_HOTSPOTS = [
   { name:"Death Valley", country:"États-Unis", lat:36.4636, lon:-116.8656 },
@@ -2398,22 +2483,11 @@ const HEAT_HOTSPOTS = [
   { name:"Phalodi", country:"Inde", lat:27.1333, lon:72.3667 },
 ];
 
-async function fetchDailyMax(spot){
-  const url = `https://api.open-meteo.com/v1/forecast?latitude=${spot.lat}&longitude=${spot.lon}&hourly=temperature_2m&forecast_days=1&timezone=auto`;
-  const res = await fetch(url);
-  if(!res.ok) throw new Error("hotspot fetch failed");
-  const data = await res.json();
-  return Math.max(...data.hourly.temperature_2m);
-}
-
 let hotspotWinner = null, hotspotFailed = false;
 async function loadWorldHotspot(){
   const titleEl = document.getElementById("hotspot-title");
   try{
-    const maxes = await Promise.all(HEAT_HOTSPOTS.map(async spot => {
-      const max = await fetchDailyMax(spot);
-      return { spot, max };
-    }));
+    const maxes = await rankTemps(HEAT_HOTSPOTS, "max");
     maxes.sort((a, b) => b.max - a.max);
     hotspotWinner = maxes[0];
     hotspotFailed = false;
@@ -2448,22 +2522,11 @@ const COLD_HOTSPOTS = [
   { name:"Pôle Sud (Amundsen-Scott)", country:"Antarctique", lat:-90, lon:0 },
 ];
 
-async function fetchDailyMin(spot){
-  const url = `https://api.open-meteo.com/v1/forecast?latitude=${spot.lat}&longitude=${spot.lon}&hourly=temperature_2m&forecast_days=1&timezone=auto`;
-  const res = await fetch(url);
-  if(!res.ok) throw new Error("coldspot fetch failed");
-  const data = await res.json();
-  return Math.min(...data.hourly.temperature_2m);
-}
-
 let coldspotWinner = null, coldspotFailed = false;
 async function loadWorldColdspot(){
   const titleEl = document.getElementById("coldspot-title");
   try{
-    const mins = await Promise.all(COLD_HOTSPOTS.map(async spot => {
-      const min = await fetchDailyMin(spot);
-      return { spot, min };
-    }));
+    const mins = await rankTemps(COLD_HOTSPOTS, "min");
     mins.sort((a, b) => a.min - b.min);
     coldspotWinner = mins[0];
     coldspotFailed = false;
@@ -2479,10 +2542,7 @@ let hotspotEuropeWinner = null, hotspotEuropeFailed = false;
 async function loadHotspotEurope(){
   const titleEl = document.getElementById("hotspot-europe-title");
   try{
-    const maxes = await Promise.all(POLLUTED_EUROPE.map(async spot => {
-      const max = await fetchDailyMax(spot);
-      return { spot, max };
-    }));
+    const maxes = await rankTemps(POLLUTED_EUROPE, "max");
     maxes.sort((a, b) => b.max - a.max);
     hotspotEuropeWinner = maxes[0];
     hotspotEuropeFailed = false;
@@ -2497,10 +2557,7 @@ let coldspotEuropeWinner = null, coldspotEuropeFailed = false;
 async function loadColdspotEurope(){
   const titleEl = document.getElementById("coldspot-europe-title");
   try{
-    const mins = await Promise.all(POLLUTED_EUROPE.map(async spot => {
-      const min = await fetchDailyMin(spot);
-      return { spot, min };
-    }));
+    const mins = await rankTemps(POLLUTED_EUROPE, "min");
     mins.sort((a, b) => a.min - b.min);
     coldspotEuropeWinner = mins[0];
     coldspotEuropeFailed = false;
@@ -2516,10 +2573,7 @@ let hotspotFranceWinner = null, hotspotFranceFailed = false;
 async function loadHotspotFrance(){
   const titleEl = document.getElementById("hotspot-france-title");
   try{
-    const maxes = await Promise.all(POLLUTED_FRANCE.map(async spot => {
-      const max = await fetchDailyMax(spot);
-      return { spot, max };
-    }));
+    const maxes = await rankTemps(POLLUTED_FRANCE, "max");
     maxes.sort((a, b) => b.max - a.max);
     hotspotFranceWinner = maxes[0];
     hotspotFranceFailed = false;
@@ -2534,10 +2588,7 @@ let coldspotFranceWinner = null, coldspotFranceFailed = false;
 async function loadColdspotFrance(){
   const titleEl = document.getElementById("coldspot-france-title");
   try{
-    const mins = await Promise.all(POLLUTED_FRANCE.map(async spot => {
-      const min = await fetchDailyMin(spot);
-      return { spot, min };
-    }));
+    const mins = await rankTemps(POLLUTED_FRANCE, "min");
     mins.sort((a, b) => a.min - b.min);
     coldspotFranceWinner = mins[0];
     coldspotFranceFailed = false;
@@ -2572,24 +2623,11 @@ const POLLUTED_HOTSPOTS = [
   { name:"Pékin", country:"Chine", lat:39.9042, lon:116.4074 },
 ];
 
-async function fetchCurrentAqi(spot){
-  const url = `https://air-quality-api.open-meteo.com/v1/air-quality?latitude=${spot.lat}&longitude=${spot.lon}&current=european_aqi&timezone=auto`;
-  const res = await fetch(url);
-  if(!res.ok) throw new Error("smog fetch failed");
-  const data = await res.json();
-  const aqi = data.current && data.current.european_aqi;
-  if(aqi == null) throw new Error("smog fetch: no data");
-  return aqi;
-}
-
 let smogWinner = null, smogFailed = false;
 async function loadWorldSmog(){
   const titleEl = document.getElementById("smog-title");
   try{
-    const values = await Promise.all(POLLUTED_HOTSPOTS.map(async spot => {
-      const aqi = await fetchCurrentAqi(spot);
-      return { spot, aqi };
-    }));
+    const values = await rankAqis(POLLUTED_HOTSPOTS);
     values.sort((a, b) => b.aqi - a.aqi);
     smogWinner = values[0];
     smogFailed = false;
@@ -2629,10 +2667,7 @@ let smogEuropeWinner = null, smogEuropeFailed = false;
 async function loadWorldSmogEurope(){
   const titleEl = document.getElementById("smog-europe-title");
   try{
-    const values = await Promise.all(POLLUTED_EUROPE.map(async spot => {
-      const aqi = await fetchCurrentAqi(spot);
-      return { spot, aqi };
-    }));
+    const values = await rankAqis(POLLUTED_EUROPE);
     values.sort((a, b) => b.aqi - a.aqi);
     smogEuropeWinner = values[0];
     smogEuropeFailed = false;
@@ -2671,10 +2706,7 @@ let smogFranceWinner = null, smogFranceFailed = false;
 async function loadWorldSmogFrance(){
   const titleEl = document.getElementById("smog-france-title");
   try{
-    const values = await Promise.all(POLLUTED_FRANCE.map(async spot => {
-      const aqi = await fetchCurrentAqi(spot);
-      return { spot, aqi };
-    }));
+    const values = await rankAqis(POLLUTED_FRANCE);
     values.sort((a, b) => b.aqi - a.aqi);
     smogFranceWinner = values[0];
     smogFranceFailed = false;
