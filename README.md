@@ -63,3 +63,7 @@ Pour chaque ville sélectionnée :
 - Fichier unique, aucune dépendance serveur — Chart.js chargé depuis un CDN pour le graphique.
 - Toutes les requêtes API sont mises en cache en mémoire (par ville/coordonnées) pour limiter les appels redondants.
 - Le résumé des fonctionnalités ci-dessus est aussi affiché directement dans le site, dans un panneau repliable juste avant le pied de page.
+
+## Licence
+
+© 2026 Fernand (fef73) — tous droits réservés. Voir le fichier [LICENSE](LICENSE). Les données météo restent soumises aux licences de leurs fournisseurs (Open-Meteo CC BY 4.0, INSEE / Etalab).
