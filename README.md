@@ -50,20 +50,29 @@ Pour chaque ville sélectionnée :
   ```
   ?points=45.9237,6.8694,1035,Chamonix;48.8566,2.3522,,Paris
   ```
+- Position GPS sans nom (appli mobile, raccourci) : la **commune, la région et le pays** sont retrouvés automatiquement par géocodage inverse (Nominatim / OpenStreetMap). Si le service ne répond pas en 4 secondes, « Position GPS » est affiché.
+- Depuis le lanceur [comparateur-meteo.fr](https://comparateur-meteo.fr/), le bouton **📍 Ma position** transmet la position du téléphone et le nom choisi.
 - Rafraîchissement automatique des données toutes les 15 minutes.
+
+## Hors connexion
+
+- Après une première visite, la page s'ouvre sans réseau (service worker `sw.js`).
+- La dernière réponse Open-Meteo reçue pour chaque vue est réaffichée, avec un bandeau « 📴 Hors connexion — données du 28/09, 05:26 ». Une vue jamais ouverte avec réseau (par exemple « 7 jours ») n'est pas disponible hors connexion.
 
 ## Sources de données
 
 - Prévisions horaires et géocodage : `api.open-meteo.com`, `geocoding-api.open-meteo.com`
 - Qualité de l'air (AQI, polluants, pollens) : `air-quality-api.open-meteo.com`
 - Archives 365 jours (extrêmes) : `archive-api.open-meteo.com`
+- Géocodage inverse (position GPS → commune) : `nominatim.openstreetmap.org`
 
 ## Notes techniques
 
 - Fichier unique, aucune dépendance serveur — Chart.js chargé depuis un CDN pour le graphique.
+- `sw.js` : service worker (page, Chart.js, polices et dernières réponses Open-Meteo gardés sur l'appareil pour l'usage hors connexion).
 - Toutes les requêtes API sont mises en cache en mémoire (par ville/coordonnées) pour limiter les appels redondants.
 - Le résumé des fonctionnalités ci-dessus est aussi affiché directement dans le site, dans un panneau repliable juste avant le pied de page.
 
 ## Licence
 
-© 2026 Fernand (fef73) — tous droits réservés. Voir le fichier [LICENSE](LICENSE). Les données météo restent soumises aux licences de leurs fournisseurs (Open-Meteo CC BY 4.0, INSEE / Etalab).
+© 2026 Fernand (fef73) — tous droits réservés. Voir le fichier [LICENSE](LICENSE). Les données météo restent soumises aux licences de leurs fournisseurs (Open-Meteo CC BY 4.0, INSEE / Etalab, OpenStreetMap ODbL).
