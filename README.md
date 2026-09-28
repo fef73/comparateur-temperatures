@@ -73,6 +73,10 @@ Pour chaque ville sélectionnée :
 - Toutes les requêtes API sont mises en cache en mémoire (par ville/coordonnées) pour limiter les appels redondants.
 - Le résumé des fonctionnalités ci-dessus est aussi affiché directement dans le site, dans un panneau repliable juste avant le pied de page.
 
+## Contact
+
+Un bug, une idée, une question ? Le lien **✉️ Contact / suggestion** en bas de chaque page ouvre un court formulaire, sans compte à créer : https://forms.gle/EMZtxMBJCUE6HJXp8
+
 ## Licence
 
 © 2026 Fernand (fef73) — tous droits réservés. Voir le fichier [LICENSE](LICENSE). Les données météo restent soumises aux licences de leurs fournisseurs (Open-Meteo CC BY 4.0, INSEE / Etalab, OpenStreetMap ODbL).
