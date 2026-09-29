@@ -331,6 +331,13 @@
     margin-top:16px; padding-top:14px; border-top:1px solid var(--hairline);
   }
   .bulletin-aqi-history:empty{display:none;}
+  #bulletin-pollution:has(.bulletin-aqi-history:empty){display:none;}
+  .bulletin-more{
+    display:block; width:100%; margin-top:14px; padding:9px 12px; cursor:pointer;
+    font-family:'IBM Plex Mono', monospace; font-size:12px; color:var(--live); text-align:center;
+    background:rgba(126,228,184,.06); border:1px dashed rgba(126,228,184,.35); border-radius:10px;
+  }
+  .bulletin-more:hover{ background:rgba(126,228,184,.12); }
   .bulletin-aqi-header{
     font-family:'IBM Plex Mono', monospace; font-size:11px; letter-spacing:.08em; text-transform:uppercase;
     color:var(--text-lo); margin-bottom:10px;
@@ -539,6 +546,9 @@
     </div>
   </div>
 
+  <!-- Bulletin de la période, au-dessus des courbes -->
+  <div class="bulletin" id="bulletin-period" style="margin:0 0 22px;"></div>
+
   <div class="panel">
     <div class="chart-holder">
       <div id="chart-status">Ajoute une ville pour démarrer la comparaison.</div>
@@ -549,7 +559,10 @@
 
   <div class="cards" id="cards"></div>
 
-  <div class="bulletin" id="bulletin-period"></div>
+  <!-- Historique pollution (7 derniers jours), rempli par renderRecentAqiHistory -->
+  <div class="bulletin" id="bulletin-pollution">
+    <div class="bulletin-aqi-history" id="bulletin-aqi-history" style="margin-top:0; padding-top:0; border-top:none;"></div>
+  </div>
 
   <div class="hotspot-banner" id="hotspot-banner">
     <div class="hotspot-icon">🔥</div>
@@ -744,6 +757,7 @@ const TRANSLATIONS = {
     thresholdGel: (g, u) => `Seuil de gel (${g}${u})`,
     periodToday: "aujourd'hui", periodTomorrow: "demain", periodAfterTomorrow: "après-demain",
     periodThreeDays: "sur les 3 prochains jours", periodSevenDays: "sur les 7 prochains jours",
+    bulletinMore: "👇 Fais défiler vers le bas pour plus d'infos : courbes, détail par ville, pollution, records de l'année…",
     bulletinHeader: (label) => `📅 bulletin — ${label}`,
     bulletinLead: (city, temp, label, u) => `${city} tient la tête ${label} avec ${temp}${u}`,
     bulletinColdSuffix: (city, temp, u) => `, tandis que ${city} est la plus fraîche avec ${temp}${u}`,
@@ -871,6 +885,7 @@ const TRANSLATIONS = {
     thresholdGel: (g, u) => `Frost threshold (${g}${u})`,
     periodToday: "today", periodTomorrow: "tomorrow", periodAfterTomorrow: "the day after tomorrow",
     periodThreeDays: "over the next 3 days", periodSevenDays: "over the next 7 days",
+    bulletinMore: "👇 Scroll down for more: curves, per-city details, pollution, yearly records…",
     bulletinHeader: (label) => `📅 bulletin — ${label}`,
     bulletinLead: (city, temp, label, u) => `${city} is in the lead ${label} with ${temp}${u}`,
     bulletinColdSuffix: (city, temp, u) => `, while ${city} is the coolest at ${temp}${u}`,
@@ -1981,7 +1996,7 @@ function buildPeriodBulletin(results){
     <div class="bulletin-header">${t("bulletinHeader", label)}</div>
     <div class="bulletin-summary">${summaryText}</div>
     ${alertsHtml}
-    <div class="bulletin-aqi-history" id="bulletin-aqi-history"></div>
+    <button type="button" class="bulletin-more" onclick="document.querySelector('.panel').scrollIntoView({behavior:'smooth'})">${t("bulletinMore")}</button>
   `;
 
   renderRecentAqiHistory(results);
@@ -2107,6 +2122,7 @@ async function loadAndRender(){
     statusEl.textContent = t("chartStatusEmpty");
     cardsEl.innerHTML = "";
     document.getElementById("bulletin-period").innerHTML = "";
+    document.getElementById("bulletin-aqi-history").innerHTML = "";
     if(chart){ chart.destroy(); chart = null; }
     document.getElementById("updated-at").textContent = "";
     return;
