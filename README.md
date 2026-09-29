@@ -31,6 +31,7 @@ Pour chaque ville sélectionnée :
 ## Bulletin de la période
 
 - Placé au-dessus des courbes, et terminé par une invitation « 👇 Fais défiler vers le bas pour plus d'infos » qui, touchée, descend jusqu'au graphique.
+- **Résumé par ville** en tête : temps dominant de la journée (ensoleillé, éclaircies, nuageux, brouillard) ou phénomène notable (pluie, neige, orages, avec leur durée en heures, ou en jours sur 3 et 7 jours), températures min → max, et rafales quand elles dépassent 40 km/h. La région, le pays et l'altitude précisée sont rappelés à côté du nom.
 - Ville la plus chaude et ville la plus fraîche pour la période affichée.
 - Alertes automatiques si une ville dépasse le seuil canicule ou descend sous le seuil de gel.
 - Historique de pollution des 7 derniers jours complets, par ville, dans son propre encadré sous les cartes (puces journalières, en évidence si AQI ≥60).
