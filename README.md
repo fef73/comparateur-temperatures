@@ -22,7 +22,8 @@ Application météo mono-fichier (HTML/CSS/JS, sans backend) permettant de compa
 Pour chaque ville sélectionnée :
 
 - Température actuelle (ou à midi pour demain/après-demain), icône météo, heure locale mise à jour en direct.
-- Humidité, vent (vitesse + direction), heure du soleil au plus haut, min/max de la période.
+- Humidité, vent (vitesse + direction), min/max de la période.
+- **Éphéméride** : arc solaire avec la position du soleil à l'heure locale de la ville (la nuit : « lever dans … »), lever et coucher, midi solaire, durée du jour et son évolution quotidienne, phase de lune (pourcentage éclairé) et date de la prochaine pleine lune. Sur « Demain » et « Après-demain », les heures de ce jour-là.
 - **AQI moyen (7 jours)** : cliquable, affiché en rouge si supérieur à 60. Le clic déplie :
   - le détail par **polluant** — PM2.5, PM10, Ozone, NO₂, SO₂ — en rouge si le seuil santé OMS (moyenne 24h) est dépassé, avec description complète au survol de chaque puce ;
   - le détail par **pollen** — bouleau, graminées, olivier, ambroisie, aulne, armoise — en rouge au-delà d'un repère indicatif de risque allergique (données disponibles pour l'Europe uniquement).
@@ -30,6 +31,7 @@ Pour chaque ville sélectionnée :
 
 ## Bulletin de la période
 
+- **Saint du jour** (calendrier des saints en France) sur la ligne du bulletin — ou celui de demain / après-demain selon la vue.
 - Placé au-dessus des courbes, et terminé par une invitation « 👇 Fais défiler vers le bas pour plus d'infos » qui, touchée, descend jusqu'au graphique.
 - **Résumé par ville** en tête : temps dominant de la journée (ensoleillé, éclaircies, nuageux, brouillard) ou phénomène notable (pluie, neige, orages, avec leur durée en heures, ou en jours sur 3 et 7 jours), températures min → max, et rafales quand elles dépassent 40 km/h. La région, le pays et l'altitude précisée sont rappelés à côté du nom.
 - Ville la plus chaude et ville la plus fraîche pour la période affichée.

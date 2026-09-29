@@ -324,6 +324,17 @@
   .bulletin-city-name{ font-weight:600; }
   .bulletin-city-place{ color:var(--text-lo); }
   .bulletin-city-meta{ font-family:'IBM Plex Mono', monospace; font-size:12px; color:var(--text-lo); white-space:nowrap; }
+  .eph{ margin:12px 0 4px; padding:10px 0 12px; border-top:1px solid var(--hairline); border-bottom:1px solid var(--hairline); }
+  .eph-arc{ display:block; width:100%; height:auto; max-height:90px; }
+  .eph-row{ display:flex; justify-content:space-between; align-items:center; margin-top:4px; font-size:14px; color:var(--text-hi); }
+  .eph-row b{ font-family:'IBM Plex Mono', monospace; font-weight:600; font-size:15px; }
+  .eph-mid{ font-family:'IBM Plex Mono', monospace; font-size:11.5px; color:var(--text-lo); }
+  .eph-night{ margin-top:6px; font-size:12.5px; color:#a8c5e8; text-align:center; }
+  .eph-line{ margin-top:6px; font-family:'IBM Plex Mono', monospace; font-size:11.5px; color:var(--text-lo); }
+  .eph-line b{ color:var(--text-hi); font-weight:500; }
+  .bulletin-saint{ margin-left:auto; text-transform:none; letter-spacing:0; font-size:11.5px; color:var(--text-lo); }
+  .bulletin-saint b{ color:var(--text-hi); font-weight:500; }
+  .bulletin-header{ flex-wrap:wrap; }
   .bulletin-alerts{
     display:flex; flex-direction:column; gap:8px; margin-top:14px;
   }
@@ -1028,7 +1039,9 @@ const FEATURES_CONTENT = {
         <h3>🗂️ Cartes par ville</h3>
         <ul>
           <li>Température actuelle (ou à midi pour demain/après-demain), icône météo, heure locale en direct</li>
-          <li>Humidité, vent (vitesse + direction), heure du soleil au zénith, min/max de la période</li>
+          <li>Humidité, vent (vitesse + direction), min/max de la période</li>
+          <li><b>Éphéméride</b> : arc solaire avec la position du soleil à l'heure locale, lever et coucher, midi solaire, durée du jour et son évolution, phase de lune et prochaine pleine lune</li>
+          <li>Saint du jour affiché sur la ligne du bulletin</li>
           <li><b>AQI moyen (7j)</b> cliquable, en rouge si &gt;60, avec détail par polluant (PM2.5, PM10, Ozone, NO₂, SO₂ — rouge si seuil santé OMS dépassé) et par pollen (bouleau, graminées, olivier, ambroisie, aulne, armoise — rouge si risque allergique)</li>
           <li><b>Population exposée</b> sur la ligne AQI : en France, bassin de l'intercommunalité (EPCI, INSEE via geo.api.gouv.fr) ; hors France, population de la ville (Open-Meteo / GeoNames) — détail commune au survol</li>
           <li>Extrêmes sur 365 jours : nb de jours de canicule, gel, vent fort (rafales ≥60 km/h), pollution</li>
@@ -1069,7 +1082,9 @@ const FEATURES_CONTENT = {
         <h3>🗂️ Per-city cards</h3>
         <ul>
           <li>Current temperature (or noon for tomorrow/day after), weather icon, live local time</li>
-          <li>Humidity, wind (speed + direction), solar noon, period min/max</li>
+          <li>Humidity, wind (speed + direction), period min/max</li>
+          <li><b>Ephemeris</b>: sun arc with the sun's position at local time, sunrise and sunset, solar noon, day length and its trend, moon phase and next full moon</li>
+          <li>Saint of the day shown on the bulletin line</li>
           <li>Clickable <b>Avg AQI (7d)</b>, red if &gt;60, with per-pollutant detail (PM2.5, PM10, Ozone, NO₂, SO₂ — red past the WHO health guideline) and per-pollen detail (birch, grass, olive, ragweed, alder, mugwort — red past the allergy-risk marker)</li>
           <li><b>Exposed population</b> on the AQI line: in France, the inter-municipal area (EPCI, INSEE via geo.api.gouv.fr); elsewhere, the city's population (Open-Meteo / GeoNames) — town detail on hover</li>
           <li>365-day extremes: number of heatwave, frost, strong wind (gusts ≥60 km/h) and pollution days</li>
@@ -1781,7 +1796,7 @@ async function fetchCityTemps(city){
   const isMultiDay = viewDay === "threeDays" || viewDay === "sevenDays";
   const numDays = viewDay === "sevenDays" ? 7 : viewDay === "threeDays" ? 3 : 1;
   const forecastDays = Math.max(3, numDays); // au moins 3 pour couvrir l'après-demain
-  let url = `https://api.open-meteo.com/v1/forecast?latitude=${city.lat}&longitude=${city.lon}&hourly=temperature_2m,weather_code,relative_humidity_2m,wind_speed_10m,wind_direction_10m&daily=sunrise,sunset&forecast_days=${forecastDays}&timezone=auto`;
+  let url = `https://api.open-meteo.com/v1/forecast?latitude=${city.lat}&longitude=${city.lon}&hourly=temperature_2m,weather_code,relative_humidity_2m,wind_speed_10m,wind_direction_10m&daily=sunrise,sunset,daylight_duration&forecast_days=${forecastDays}&timezone=auto`;
   if(city.elevation != null){
     url += `&elevation=${city.elevation}`;
   }
@@ -1823,7 +1838,113 @@ async function fetchCityTemps(city){
     windDirections: slice(data.hourly.wind_direction_10m),
     solarNoon: solarNoon,
     utcOffsetSeconds: data.utc_offset_seconds,
+    sun: data.daily ? {
+      sunrise: data.daily.sunrise, sunset: data.daily.sunset, daylight: data.daily.daylight_duration,
+      dayIdx, live: viewDay === "today" || isMultiDay, offset: data.utc_offset_seconds,
+      date: (data.daily.time || [])[dayIdx],
+    } : null,
   };
+}
+
+// ---------- Éphéméride : arc solaire, durée du jour, lune (bloc des cartes) ----------
+const EPH_TXT = {
+  fr: { sunrise:"lever", sunset:"coucher", daylight:"durée du jour", perDay:"/jour", noon:"midi solaire",
+        night:"🌙 Nuit — lever dans", nightTomorrow:"🌙 Nuit — lever demain à", fullMoon:"pleine lune le",
+        today:"aujourd'hui",
+        phases:["Nouvelle lune","Premier croissant","Premier quartier","Gibbeuse croissante","Pleine lune","Gibbeuse décroissante","Dernier quartier","Dernier croissant"] },
+  en: { sunrise:"sunrise", sunset:"sunset", daylight:"daylight", perDay:"/day", noon:"solar noon",
+        night:"🌙 Night — sunrise in", nightTomorrow:"🌙 Night — sunrise tomorrow at", fullMoon:"full moon on",
+        today:"today",
+        phases:["New moon","Waxing crescent","First quarter","Waxing gibbous","Full moon","Waning gibbous","Last quarter","Waning crescent"] },
+};
+function ephT(k){ return (EPH_TXT[lang] || EPH_TXT.fr)[k]; }
+function ephMinutes(iso){ const [h, m] = iso.split("T")[1].split(":").map(Number); return h * 60 + m; }
+function ephHM(min){ min = ((Math.round(min) % 1440) + 1440) % 1440; return String(Math.floor(min / 60)).padStart(2, "0") + "h" + String(min % 60).padStart(2, "0"); }
+function ephDuration(min){ min = Math.round(min); return Math.floor(min / 60) + " h " + String(min % 60).padStart(2, "0"); }
+
+// Phase de lune (cycle synodique moyen, référence : nouvelle lune du 6 janvier 2000 à 18h14 UTC)
+function ephMoon(dateStr){
+  const SYN = 29.530588853;
+  const t = new Date(dateStr + "T12:00:00Z").getTime();
+  const age = ((((t - Date.UTC(2000, 0, 6, 18, 14)) / 864e5) % SYN) + SYN) % SYN;
+  const illum = Math.round((1 - Math.cos(2 * Math.PI * age / SYN)) / 2 * 100);
+  const idx = Math.floor(age / SYN * 8 + 0.5) % 8;
+  let toFull = SYN / 2 - age; if(toFull < 0.5) toFull += SYN;
+  const full = new Date(t + toFull * 864e5);
+  const fullTxt = full.toLocaleDateString(lang === "en" ? "en-GB" : "fr-FR", { day:"numeric", month:"short", timeZone:"UTC" });
+  return { icon: ["🌑","🌒","🌓","🌔","🌕","🌖","🌗","🌘"][idx], name: ephT("phases")[idx], illum, fullTxt };
+}
+
+// sun = { sunrise:[ISO…], sunset:[ISO…], daylight:[secondes…], dayIdx, live, offset (s), date "AAAA-MM-JJ" }
+function ephemerisHtml(sun){
+  if(!sun || !sun.sunrise || !sun.sunrise[sun.dayIdx] || !sun.sunset[sun.dayIdx]) return "";
+  const d = sun.dayIdx;
+  const rise = ephMinutes(sun.sunrise[d]), set = ephMinutes(sun.sunset[d]);
+  const dayLen = sun.daylight && sun.daylight[d] != null ? sun.daylight[d] / 60 : set - rise;
+  // évolution de la durée du jour : avec le jour suivant, sinon avec la veille
+  let delta = null;
+  if(sun.daylight){
+    if(sun.daylight[d + 1] != null) delta = (sun.daylight[d + 1] - sun.daylight[d]) / 60;
+    else if(d > 0 && sun.daylight[d - 1] != null) delta = (sun.daylight[d] - sun.daylight[d - 1]) / 60;
+  }
+  const deltaTxt = delta == null ? "" : ` · ${delta >= 0 ? "+" : "−"}${Math.abs(Math.round(delta))} min${ephT("perDay")}`;
+
+  // position du soleil (heure locale de la ville), seulement pour aujourd'hui
+  let f = null, nightTxt = "";
+  if(sun.live){
+    const local = new Date(Date.now() + (sun.offset || 0) * 1000);
+    const now = local.getUTCHours() * 60 + local.getUTCMinutes();
+    if(now < rise) nightTxt = `${ephT("night")} ${ephDuration(rise - now)}`;
+    else if(now > set) nightTxt = sun.sunrise[d + 1] ? `${ephT("nightTomorrow")} ${ephHM(ephMinutes(sun.sunrise[d + 1]))}` : "";
+    else f = (now - rise) / (set - rise);
+  }
+
+  // arc : de x0 à x1, hauteur h au-dessus de la ligne d'horizon
+  const x0 = 16, x1 = 284, base = 62, h = 44;
+  const pt = (p) => [x0 + (x1 - x0) * p, base - h * Math.sin(Math.PI * p)];
+  const curve = (a, b) => { let s = ""; for(let i = 0; i <= 40; i++){ const [x, y] = pt(a + (b - a) * i / 40); s += (i ? " L" : "M") + x.toFixed(1) + " " + y.toFixed(1); } return s; };
+  let sunSvg = "", fill = "";
+  if(f != null){
+    const [sx, sy] = pt(f);
+    fill = `<path d="${curve(0, f)} L${sx.toFixed(1)} ${base} Z" fill="rgba(244,162,97,.22)"/>`;
+    sunSvg = `<circle cx="${sx.toFixed(1)}" cy="${sy.toFixed(1)}" r="13" fill="rgba(251,191,36,.28)"/><circle cx="${sx.toFixed(1)}" cy="${sy.toFixed(1)}" r="8" fill="#fbbf24"/>`;
+  }
+  const moon = ephMoon(sun.date);
+  return `
+    <div class="eph">
+      <svg class="eph-arc" viewBox="0 0 300 76" preserveAspectRatio="xMidYMid meet" aria-hidden="true">
+        ${fill}
+        <line x1="${x0}" y1="${base}" x2="${x1}" y2="${base}" stroke="rgba(143,164,184,.45)" stroke-width="1.5"/>
+        <path d="${curve(0, 1)}" fill="none" stroke="rgba(143,164,184,.6)" stroke-width="1.5"/>
+        <circle cx="${x0}" cy="${base}" r="3.5" fill="#8fa4b8"/><circle cx="${x1}" cy="${base}" r="3.5" fill="#8fa4b8"/>
+        ${sunSvg}
+      </svg>
+      <div class="eph-row">
+        <span title="${ephT("sunrise")}">☀️ <b>${ephHM(rise)}</b></span>
+        <span class="eph-mid" title="${ephT("noon")}">🕛 ${ephHM((rise + set) / 2)}</span>
+        <span title="${ephT("sunset")}">🌅 <b>${ephHM(set)}</b></span>
+      </div>
+      ${nightTxt ? `<div class="eph-night">${nightTxt}</div>` : ""}
+      <div class="eph-line">⏱ ${ephT("daylight")} <b>${ephDuration(dayLen)}</b>${deltaTxt}</div>
+      <div class="eph-line">${moon.icon} ${moon.name} · ${moon.illum} % · ${ephT("fullMoon")} ${moon.fullTxt}</div>
+    </div>`;
+}
+
+// ---------- Saint du jour (calendrier des saints en France) ----------
+const SAINTS = [["Marie, mère de Dieu", "Basile et Grégoire", "Geneviève", "Odilon", "Édouard", "Mélaine", "Raymond", "Lucien", "Alix", "Guillaume", "Paulin", "Tatiana", "Yvette", "Nina", "Rémi", "Marcel", "Roseline", "Prisca", "Marius", "Sébastien", "Agnès", "Vincent", "Barnard", "François de Sales", "Ananie et Conversion de saint Paul", "Paule", "Angèle", "Thomas d'Aquin", "Gildas", "Martine", "Marcelle"], ["Ella", "Théophane, Chandeleur", "Blaise", "Véronique", "Agathe", "Gaston", "Eugénie", "Jacqueline", "Apolline", "Arnaud", "Héloïse et Notre-Dame de Lourdes", "Félix", "Béatrice", "Valentin", "Claude", "Julienne", "Alexis", "Bernadette", "Gabin", "Aimée", "Pierre-Damien", "Isabelle", "Lazare", "Modeste", "Roméo", "Nestor", "Honorine", "Romain", "Auguste"], ["Aubin", "Charles", "Guénolé", "Casimir", "Olive", "Colette", "Félicité", "Jean de Dieu", "Françoise", "Vivien", "Rosine", "Justine", "Rodrigue", "Mathilde", "Louise", "Bénédicte", "Patrice", "Cyrille", "Joseph", "Herbert", "Clémence", "Léa", "Victorien", "Catherine", "Humbert, Annonciation", "Larissa", "Habib", "Gontran", "Gwladys", "Amédée", "Benjamin"], ["Hugues", "Sandrine et Alexandrine", "Richard", "Isidore", "Irène", "Marcellin", "Jean-Baptiste de La Salle", "Julie", "Gauthier", "Fulbert", "Stanislas", "Jules", "Ida", "Maxime", "Paterne", "Benoît-Joseph", "Anicet", "Parfait", "Emma", "Odette", "Anselme", "Alexandre", "Georges", "Fidèle", "Marc", "Alida", "Zita", "Valérie", "Catherine de Sienne", "Robert"], ["Jérémie, Fête du Travail", "Boris", "Philippe et Jacques", "Sylvain", "Judith", "Prudence", "Gisèle", "Désiré, Victoire du 8 mai 1945", "Pacôme", "Solange", "Estelle", "Achille", "Rolande", "Matthias", "Denise", "Honoré", "Pascal", "Éric", "Yves", "Bernardin", "Constantin", "Émile", "Didier", "Donatien", "Sophie", "Bérenger", "Augustin", "Germain", "Aymard", "Ferdinand", "Perrine et Visitation de la Vierge Marie"], ["Justin", "Blandine", "Kévin", "Clotilde", "Igor", "Norbert", "Gilbert", "Médard", "Diane", "Landry", "Barnabé", "Guy", "Antoine de Padoue", "Élisée", "Germaine", "Jean-François Régis", "Hervé", "Léonce", "Romuald", "Silvère", "Rodolphe", "Alban", "Audrey", "Jean-Baptiste", "Éléonore et Prosper", "Anthelme", "Fernand", "Irénée", "Pierre et Paul", "Martial"], ["Thierry", "Martinien", "Thomas", "Florent", "Antoine", "Mariette", "Raoul", "Thibaut", "Amandine", "Ulrich", "Benoît", "Olivier", "Henri et Joël", "Camille, Fête nationale", "Donald", "Carmen et Notre-Dame du Mont-Carmel", "Charlotte", "Frédéric", "Arsène", "Marina", "Victor", "Marie-Madeleine", "Brigitte", "Christine", "Jacques", "Anne et Joachim", "Nathalie", "Samson", "Marthe", "Juliette", "Ignace"], ["Alphonse", "Julien", "Lydie", "Jean-Marie Vianney", "Abel", "Octavien, Transfiguration", "Gaétan", "Dominique", "Amour", "Laurent", "Claire", "Clarisse et Jeanne", "Hippolyte", "Évrard", "Marie, Assomption", "Armel", "Hyacinthe", "Hélène", "Jean-Eudes", "Bernard", "Christophe", "Fabrice", "Rose", "Barthélemy", "Louis", "Natacha et Adrien", "Monique", "Augustin", "Sabine", "Fiacre", "Aristide"], ["Gilles", "Ingrid", "Grégoire", "Rosalie", "Raïssa", "Bertrand", "Reine", "Adrien et Nativité de Marie", "Alain", "Inès", "Adelphe", "Apollinaire", "Aimé", "Cyprien et Exaltation de la Sainte-Croix", "Roland", "Édith", "Renaud", "Nadège", "Émilie", "Davy", "Matthieu", "Maurice", "Constant", "Thècle", "Hermann", "Côme et Damien", "Vincent de Paul", "Venceslas", "Michel", "Jérôme"], ["Thérèse", "Léger", "Gérard", "François d'Assise", "Fleur", "Bruno", "Serge", "Pélagie", "Denis", "Ghislain", "Firmin", "Wilfried", "Géraud", "Juste", "Aurélie et Thérèse d'Avila", "Edwige", "Baudouin", "Luc", "René", "Adeline", "Céline", "Élodie", "Jean", "Florentin", "Crépin et Enguerrand", "Dimitri", "Émeline", "Simon et Jude", "Narcisse", "Bienvenue", "Quentin"], ["Toussaint et Harold", "Défunts et Océane", "Hubert", "Charles", "Sylvie", "Léonard et Bertille", "Carine", "Geoffroy", "Théodore", "Léon", "Martin, Armistice 1918", "Christian", "Brice", "Sidoine", "Albert", "Marguerite", "Élisabeth", "Aude", "Tanguy", "Edmond", "Rufus et Présentation de Marie", "Cécile", "Clément", "Flora", "Catherine", "Delphine", "Séverin et Marie", "Jacques", "Saturnin", "André"], ["Florence", "Viviane", "François-Xavier", "Barbara", "Gérald", "Nicolas", "Ambroise", "Immaculée Conception et Frida", "Pierre Fourier", "Romaric", "Daniel", "Corentin", "Lucie", "Odile", "Ninon", "Alice", "Judicaël et Gaël", "Gatien", "Urbain", "Théophile et Ignace", "Pierre Canisius", "Françoise-Xavière", "Armand", "Adèle", "Noël et Emmanuel", "Étienne", "Jean", "Gaspard et Saints Innocents", "David", "Roger", "Sylvestre"]];
+function saintOf(dateStr){
+  if(!dateStr) return "";
+  const [, m, d] = dateStr.split("-").map(Number);
+  return (SAINTS[m - 1] || [])[d - 1] || "";
+}
+function saintLabel(dateStr){
+  const name = saintOf(dateStr);
+  if(!name) return "";
+  const en = lang === "en";
+  const lbl = viewDay === "tomorrow" ? (en ? "Tomorrow's saint" : "Saint de demain")
+            : viewDay === "afterTomorrow" ? (en ? "Saint of the day after" : "Saint d'après-demain")
+            : (en ? "Saint of the day" : "Saint du jour");
+  return `<span class="bulletin-saint">😇 ${lbl}${en ? ":" : " :"} <b>${name}</b></span>`;
 }
 
 function weatherEmoji(code){
@@ -2049,7 +2170,7 @@ function buildPeriodBulletin(results){
   }).join("")}</div>`;
 
   el.innerHTML = `
-    <div class="bulletin-header">${t("bulletinHeader", label)}</div>
+    <div class="bulletin-header">${t("bulletinHeader", label)}${saintLabel((results[0].timestamps[0] || "").slice(0, 10))}</div>
     ${citiesHtml}
     <div class="bulletin-summary">${summaryText}</div>
     ${alertsHtml}
@@ -2134,11 +2255,11 @@ function buildCards(results){
           </div>
           <div class="card-humidity">💧 ${t("cardHumidity")} <b id="hum-${r.city.id}">${humidity != null ? humidity + "%" : "--"}</b></div>
           <div class="card-wind">💨 ${t("cardWind")} <b id="wind-${r.city.id}">${wind.speed != null ? wind.speed + " km/h" + (wind.direction ? " " + wind.direction : "") : "--"}</b></div>
-          <div class="card-sun">☀️ ${t("cardSun")} <b>${r.solarNoon || "--"}</b></div>
           <div class="card-range">
             <span>${t("cardMin")} <b>${min}${unitSuffix()}</b></span>
             <span>${t("cardMax")} <b>${max}${unitSuffix()}</b></span>
           </div>
+          ${ephemerisHtml(r.sun)}
           <div class="card-aqi-avg" title="${t("aqiAvgTitle")}" onclick="toggleAqiDetail('${r.city.id}')">
             <span>${t("aqiAvgLabel")}<span class="aqi-pop" id="aqi-pop-${r.city.id}"></span></span>
             <span><b id="aqi-avg-${r.city.id}">…</b><span class="aqi-caret" id="aqi-caret-${r.city.id}">▴</span></span>
