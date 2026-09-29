@@ -313,6 +313,17 @@
   .bulletin-summary{
     font-size:14.5px; line-height:1.65; color:var(--text-hi); max-width:70ch;
   }
+  .bulletin-cities{
+    display:flex; flex-direction:column; gap:6px; margin:2px 0 14px; padding-bottom:14px;
+    border-bottom:1px solid var(--hairline);
+  }
+  .bulletin-city{
+    display:flex; align-items:baseline; gap:8px; font-size:13.5px; line-height:1.5; color:var(--text-hi);
+  }
+  .bulletin-city-dot{ flex:none; width:9px; height:9px; border-radius:50%; transform:translateY(-1px); }
+  .bulletin-city-name{ font-weight:600; }
+  .bulletin-city-place{ color:var(--text-lo); }
+  .bulletin-city-meta{ font-family:'IBM Plex Mono', monospace; font-size:12px; color:var(--text-lo); white-space:nowrap; }
   .bulletin-alerts{
     display:flex; flex-direction:column; gap:8px; margin-top:14px;
   }
@@ -758,6 +769,9 @@ const TRANSLATIONS = {
     periodToday: "aujourd'hui", periodTomorrow: "demain", periodAfterTomorrow: "après-demain",
     periodThreeDays: "sur les 3 prochains jours", periodSevenDays: "sur les 7 prochains jours",
     bulletinMore: "👇 Fais défiler vers le bas pour plus d'infos : courbes, détail par ville, pollution, records de l'année…",
+    citySky_sun: "ensoleillé", citySky_partly: "éclaircies", citySky_cloudy: "nuageux", citySky_fog: "brouillard",
+    cityRain: (h) => `pluie (${h} h)`, citySnow: (h) => `neige (${h} h)`, cityRainDays: (h) => `pluie (${h} j)`, citySnowDays: (h) => `neige (${h} j)`,
+    cityStorm: "orages", cityWind: (v) => `rafales jusqu'à ${v} km/h`,
     bulletinHeader: (label) => `📅 bulletin — ${label}`,
     bulletinLead: (city, temp, label, u) => `${city} tient la tête ${label} avec ${temp}${u}`,
     bulletinColdSuffix: (city, temp, u) => `, tandis que ${city} est la plus fraîche avec ${temp}${u}`,
@@ -886,6 +900,9 @@ const TRANSLATIONS = {
     periodToday: "today", periodTomorrow: "tomorrow", periodAfterTomorrow: "the day after tomorrow",
     periodThreeDays: "over the next 3 days", periodSevenDays: "over the next 7 days",
     bulletinMore: "👇 Scroll down for more: curves, per-city details, pollution, yearly records…",
+    citySky_sun: "sunny", citySky_partly: "sunny spells", citySky_cloudy: "cloudy", citySky_fog: "fog",
+    cityRain: (h) => `rain (${h} h)`, citySnow: (h) => `snow (${h} h)`, cityRainDays: (h) => `rain (${h} d)`, citySnowDays: (h) => `snow (${h} d)`,
+    cityStorm: "thunderstorms", cityWind: (v) => `winds up to ${v} km/h`,
     bulletinHeader: (label) => `📅 bulletin — ${label}`,
     bulletinLead: (city, temp, label, u) => `${city} is in the lead ${label} with ${temp}${u}`,
     bulletinColdSuffix: (city, temp, u) => `, while ${city} is the coolest at ${temp}${u}`,
@@ -1992,8 +2009,48 @@ function buildPeriodBulletin(results){
       ).join("")}</div>`
     : "";
 
+  // Petit résumé par ville (en tête du bulletin) : temps dominant, min → max, pluie / neige / vent notables
+  const multiDay = viewDay === "threeDays" || viewDay === "sevenDays";
+  const citiesHtml = `<div class="bulletin-cities">${results.map(r => {
+    const allCodes = r.weatherCodes || [];
+    const codes = allCodes.filter(c => c != null);
+    // sur plusieurs jours : nombre de jours concernés ; sur une journée : nombre d'heures
+    const count = (list) => {
+      const idx = allCodes.map((c, i) => list.includes(c) ? i : -1).filter(i => i >= 0);
+      return multiDay ? new Set(idx.map(i => (r.timestamps[i] || "").slice(0, 10))).size : idx.length;
+    };
+    const storm = count([95,96,99]);
+    const snow = count([71,73,75,77,85,86]);
+    const rain = count([51,53,55,56,57,61,63,65,66,67,80,81,82]);
+    // temps dominant en journée (7h–20h) quand il n'y a pas de phénomène notable
+    const dayCodes = allCodes.filter((c, i) => c != null && (!r.hours || (r.hours[i] >= 7 && r.hours[i] <= 20)));
+    const freq = {};
+    (dayCodes.length ? dayCodes : codes).forEach(c => {
+      const k = c === 0 ? "sun" : (c === 1 || c === 2) ? "partly" : c === 3 ? "cloudy" : (c === 45 || c === 48) ? "fog" : "other";
+      freq[k] = (freq[k] || 0) + 1;
+    });
+    const dominant = Object.keys(freq).filter(k => k !== "other").sort((a, b) => freq[b] - freq[a])[0] || "cloudy";
+    let icon, sky;
+    if(storm)         { icon = "⛈️"; sky = t("cityStorm"); }
+    else if(snow)     { icon = "❄️"; sky = t(multiDay ? "citySnowDays" : "citySnow", snow); }
+    else if(rain >= (multiDay ? 1 : 2)){ icon = "🌧️"; sky = t(multiDay ? "cityRainDays" : "cityRain", rain); }
+    else { icon = { sun:"☀️", partly:"🌤️", cloudy:"☁️", fog:"🌫️" }[dominant]; sky = t("citySky_" + dominant); }
+    const min = convTemp(Math.min(...r.temps)).toFixed(1), max = convTemp(Math.max(...r.temps)).toFixed(1);
+    const winds = (r.windSpeeds || []).filter(v => v != null);
+    const wind = winds.length ? Math.round(Math.max(...winds)) : 0;
+    const windTxt = wind >= 40 ? ` · 💨 ${t("cityWind", wind)}` : "";
+    const alt = (r.city.elevation != null && !isNaN(r.city.elevation)) ? `${Math.round(r.city.elevation)} m` : "";
+    const place = [[r.city.admin1, r.city.country].filter(Boolean).join(", "), alt].filter(Boolean).join(" · ");
+    return `<div class="bulletin-city">
+      <span class="bulletin-city-dot" style="background:${r.city.color}"></span>
+      <span><span class="bulletin-city-name">${r.city.name}</span>${place ? `<span class="bulletin-city-place"> · ${place}</span>` : ""} — ${icon} ${sky}
+      · <span class="bulletin-city-meta">${min} → ${max}${unitSuffix()}${windTxt}</span></span>
+    </div>`;
+  }).join("")}</div>`;
+
   el.innerHTML = `
     <div class="bulletin-header">${t("bulletinHeader", label)}</div>
+    ${citiesHtml}
     <div class="bulletin-summary">${summaryText}</div>
     ${alertsHtml}
     <button type="button" class="bulletin-more" onclick="document.querySelector('.panel').scrollIntoView({behavior:'smooth'})">${t("bulletinMore")}</button>
