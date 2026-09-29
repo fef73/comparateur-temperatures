@@ -30,9 +30,10 @@ Pour chaque ville sélectionnée :
 
 ## Bulletin de la période
 
+- Placé au-dessus des courbes, et terminé par une invitation « 👇 Fais défiler vers le bas pour plus d'infos » qui, touchée, descend jusqu'au graphique.
 - Ville la plus chaude et ville la plus fraîche pour la période affichée.
 - Alertes automatiques si une ville dépasse le seuil canicule ou descend sous le seuil de gel.
-- Historique de pollution des 7 derniers jours complets, par ville (puces journalières, en évidence si AQI ≥60).
+- Historique de pollution des 7 derniers jours complets, par ville, dans son propre encadré sous les cartes (puces journalières, en évidence si AQI ≥60).
 
 ## Extrêmes mondiaux
 
