@@ -21,6 +21,7 @@ Application météo mono-fichier (HTML/CSS/JS, sans backend) permettant de compa
 
 Pour chaque ville sélectionnée :
 
+- **Carte repliable** : nom, heure locale, icône et température restent visibles ; le reste s'ouvre avec « ▾ voir le détail ». Repliées par défaut, choix mémorisé par ville sur l'appareil.
 - Température actuelle (ou à midi pour demain/après-demain), icône météo, heure locale mise à jour en direct.
 - Humidité, vent (vitesse + direction), min/max de la période.
 - **Éphéméride** : arc solaire avec la position du soleil à l'heure locale de la ville (la nuit : « lever dans … »), lever et coucher, midi solaire, durée du jour et son évolution quotidienne, phase de lune (pourcentage éclairé) et date de la prochaine pleine lune. Sur « Demain » et « Après-demain », les heures de ce jour-là.
@@ -36,11 +37,16 @@ Pour chaque ville sélectionnée :
 - **Résumé par ville** en tête : temps dominant de la journée (ensoleillé, éclaircies, nuageux, brouillard) ou phénomène notable (pluie, neige, orages, avec leur durée en heures, ou en jours sur 3 et 7 jours), températures min → max, et rafales quand elles dépassent 40 km/h. La région, le pays et l'altitude précisée sont rappelés à côté du nom.
 - Ville la plus chaude et ville la plus fraîche pour la période affichée.
 - Alertes automatiques si une ville dépasse le seuil canicule ou descend sous le seuil de gel.
-- Historique de pollution des 7 derniers jours complets, par ville, dans son propre encadré sous les cartes (puces journalières, en évidence si AQI ≥60).
+- **Bulletin pollution** des 7 derniers jours complets, par ville, dans son propre encadré repliable sous les cartes (puces journalières, en évidence si AQI ≥60).
 
-## Extrêmes mondiaux
+## Bulletin des extrêmes
 
-- Deux bandeaux calculés en direct : le point le plus chaud et le point le plus froid du monde, parmi une sélection de lieux connus pour leurs extrêmes (déserts, régions polaires, stations records) — ce n'est pas une recherche exhaustive de toutes les villes du monde.
+- Regroupés dans un bloc repliable « 🌍 Bulletin des extrêmes », comme le bulletin pollution : on touche le titre pour l'ouvrir ou le fermer (fermés par défaut, choix mémorisé).
+- Bandeaux calculés en direct, chacun parmi une sélection de lieux (ce n'est pas une recherche exhaustive) :
+  - point le plus chaud et le plus froid du **monde** (déserts, régions polaires, stations records) ;
+  - point le plus chaud et le plus froid d'**Europe** (grandes villes européennes) ;
+  - ville la plus chaude et la plus froide de **France** (grandes villes françaises) ;
+  - lieu le plus pollué (indice AQI) parmi de grandes villes du monde, d'Europe et de France.
 
 ## Confort d'usage
 
